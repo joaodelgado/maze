@@ -1,0 +1,11 @@
+[package]
+name = "maze"
+version = "0.1.0"
+authors = ["João Delgado <joaomtdelgado@gmail.com>"]
+
+[dependencies]
+piston = "0.36.0"
+piston2d-graphics = "0.26.0"
+piston2d-opengl_graphics = "0.52.0"
+pistoncore-glutin_window = "0.45.3"
+rand = "0.4.2"
