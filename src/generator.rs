@@ -84,7 +84,7 @@ impl Generator for DPS {
 
         match self.available_neighbour(&maze) {
             Some((neighbour, _)) => {
-                maze.explored.push(neighbour);
+                maze.explored.insert(neighbour);
                 maze.link(&current, &neighbour)?;
                 self.stack.push(current);
                 self.current = Some(neighbour);
@@ -92,10 +92,10 @@ impl Generator for DPS {
             None => self.current = self.stack.pop(),
         }
 
-        match self.current {
-            Some(ref current) => maze.highlighted = vec![current.clone()],
-            None => maze.highlighted = vec![],
-        };
+        maze.highlighted.clear();
+        if let Some(current) = self.current {
+            maze.highlighted.insert(current);
+        }
 
         Ok(())
     }
@@ -165,14 +165,19 @@ impl Kruskal {
 
 impl Generator for Kruskal {
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlighted.clear();
         if self.walls.is_empty() {
-            maze.highlighted = vec![];
             return Ok(());
         }
 
         if let Some(wall) = self.walls.pop() {
             let (c1, c2) = maze.divided_coords(&wall);
-            maze.highlighted = vec![c1, c2];
+
+            maze.explored.insert(c1);
+            maze.explored.insert(c2);
+            maze.highlighted.insert(c1);
+            maze.highlighted.insert(c2);
+
             match self.join(c1, c2) {
                 Err(e) => return Err(e),
                 Ok(JoinResult::Joined) => {

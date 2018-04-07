@@ -256,8 +256,8 @@ pub struct Maze {
     pub cells: HashMap<Coord, Cell>,
     pub start: Coord,
     pub end: Coord,
-    pub explored: Vec<Coord>,
-    pub highlighted: Vec<Coord>,
+    pub explored: HashSet<Coord>,
+    pub highlighted: HashSet<Coord>,
 }
 
 impl Maze {
@@ -280,13 +280,16 @@ impl Maze {
             }
         }
 
+        let mut explored = HashSet::new();
+        explored.insert([0, 0].into());
+
         Maze {
             walls: walls,
             cells: cells,
             start: [0, 0].into(),
             end: [MAZE_WIDTH - 1, MAZE_HEIGHT - 1].into(),
-            explored: vec![[0, 0].into()],
-            highlighted: Vec::new(),
+            explored: explored,
+            highlighted: HashSet::new(),
         }
     }
 
