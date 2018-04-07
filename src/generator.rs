@@ -1,9 +1,10 @@
 use rand::{thread_rng as random, Rng};
 
+use errors::Result;
 use maze::{Coord, Direction, Maze};
 
 pub trait Generator {
-    fn tick(&mut self, maze: &mut Maze);
+    fn tick(&mut self, maze: &mut Maze) -> Result<()>;
 }
 
 pub struct RecursiveBacktracker {
@@ -33,41 +34,16 @@ impl RecursiveBacktracker {
 }
 
 impl Generator for RecursiveBacktracker {
-    fn tick(&mut self, maze: &mut Maze) {
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         let current = match self.current {
             Some(ref current) => current.clone(),
-            None => return,
+            None => return Ok(()),
         };
 
         match self.available_neighbour(&maze) {
-            Some((neighbour, direction)) => {
-                let mut current_cell = maze.cell_at(&current);
-                let mut neighbour_cell = maze.cell_at(&neighbour);
-
+            Some((neighbour, _)) => {
                 maze.explored.push(neighbour.clone());
-
-                match direction {
-                    Direction::North => {
-                        current_cell.north(false);
-                        neighbour_cell.south(false);
-                    }
-                    Direction::East => {
-                        current_cell.east(false);
-                        neighbour_cell.west(false);
-                    }
-                    Direction::South => {
-                        current_cell.south(false);
-                        neighbour_cell.north(false);
-                    }
-                    Direction::West => {
-                        current_cell.west(false);
-                        neighbour_cell.east(false);
-                    }
-                }
-
-                maze.update_cell(current_cell);
-                maze.update_cell(neighbour_cell);
-
+                maze.link(current, neighbour)?;
                 self.stack.push(current);
                 self.current = Some(neighbour);
             }
@@ -77,6 +53,8 @@ impl Generator for RecursiveBacktracker {
         match self.current {
             Some(ref current) => maze.highlighted = vec![current.clone()],
             None => maze.highlighted = vec![],
-        }
+        };
+
+        Ok(())
     }
 }

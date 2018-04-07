@@ -1,9 +1,20 @@
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+
 use graphics::types::Color;
 use opengl_graphics::GlGraphics;
 use piston::input::RenderArgs;
 
 use config::*;
+use errors::{Error, Result};
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Orientation {
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Direction {
     North,
     East,
@@ -11,29 +22,55 @@ pub enum Direction {
     West,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Point {
+    pub x: i32,
+    pub y: i32,
+}
+
+impl From<[i32; 2]> for Point {
+    fn from(a: [i32; 2]) -> Point {
+        Point { x: a[0], y: a[1] }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Coord {
-    x: i32,
-    y: i32,
+    pub x: i32,
+    pub y: i32,
 }
 
 impl Coord {
-    pub fn flat_idx(&self) -> Option<usize> {
-        let width = MAZE_WIDTH as i32;
-        let height = MAZE_HEIGHT as i32;
-        let result = match *self {
-            _ if self.x < 0 || self.x >= width || self.y < 0 || self.y >= height => None,
-            _ => Some((self.x + self.y * width) as usize),
-        };
-
-        result
+    pub fn north_wall(&self) -> Wall {
+        let as_point: Point = (*self).into();
+        Wall {
+            center: [as_point.x, as_point.y - CELL_HEIGHT as i32 / 2].into(),
+            orientation: Orientation::Horizontal,
+        }
     }
 
-    fn into_point(&self, width: f64, height: f64) -> Point {
-        [
-            self.x as f64 * width + width / 2.0,
-            self.y as f64 * height + height / 2.0,
-        ].into()
+    pub fn east_wall(&self) -> Wall {
+        let as_point: Point = (*self).into();
+        Wall {
+            center: [as_point.x + CELL_WIDTH as i32 / 2, as_point.y].into(),
+            orientation: Orientation::Vertical,
+        }
+    }
+
+    pub fn south_wall(&self) -> Wall {
+        let as_point: Point = (*self).into();
+        Wall {
+            center: [as_point.x, as_point.y + CELL_HEIGHT as i32 / 2].into(),
+            orientation: Orientation::Horizontal,
+        }
+    }
+
+    pub fn west_wall(&self) -> Wall {
+        let as_point: Point = (*self).into();
+        Wall {
+            center: [as_point.x - CELL_WIDTH as i32 / 2, as_point.y].into(),
+            orientation: Orientation::Vertical,
+        }
     }
 
     pub fn valid_coord(&self) -> bool {
@@ -81,6 +118,15 @@ impl Coord {
     }
 }
 
+impl Into<Point> for Coord {
+    fn into(self) -> Point {
+        Point {
+            x: self.x * CELL_WIDTH as i32 + CELL_WIDTH as i32 / 2,
+            y: self.y * CELL_HEIGHT as i32 + CELL_HEIGHT as i32 / 2,
+        }
+    }
+}
+
 impl From<[i32; 2]> for Coord {
     fn from(a: [i32; 2]) -> Coord {
         Coord { x: a[0], y: a[1] }
@@ -96,31 +142,36 @@ impl From<[u32; 2]> for Coord {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Point {
-    x: f64,
-    y: f64,
-}
-
-impl From<[f64; 2]> for Point {
-    fn from(a: [f64; 2]) -> Point {
-        Point { x: a[0], y: a[1] }
+impl fmt::Display for Coord {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {}", self.x, self.y)
     }
 }
 
-#[derive(Debug, Clone)]
-struct Wall {
-    start: Point,
-    end: Point,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Wall {
+    center: Point,
+    orientation: Orientation,
 }
 
 impl Wall {
     fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
         use graphics::line::Line;
 
+        let (start, end): (Point, Point) = match self.orientation {
+            Orientation::Horizontal => (
+                [self.center.x - CELL_WIDTH as i32 / 2, self.center.y].into(),
+                [self.center.x + CELL_WIDTH as i32 / 2, self.center.y].into(),
+            ),
+            Orientation::Vertical => (
+                [self.center.x, self.center.y - CELL_HEIGHT as i32 / 2].into(),
+                [self.center.x, self.center.y + CELL_HEIGHT as i32 / 2].into(),
+            ),
+        };
+
         gl.draw(args.viewport(), |c, gl| {
             Line::new(COLOR_WALL, CELL_WALL_WIDTH / 2.0).draw(
-                [self.start.x, self.start.y, self.end.x, self.end.y],
+                [start.x as f64, start.y as f64, end.x as f64, end.y as f64],
                 &c.draw_state,
                 c.transform,
                 gl,
@@ -131,102 +182,12 @@ impl Wall {
 
 #[derive(Debug, Clone)]
 pub struct Cell {
-    pub coord: Coord,
     center: Point,
-
-    north: Option<Wall>,
-    east: Option<Wall>,
-    south: Option<Wall>,
-    west: Option<Wall>,
 }
 
 impl Cell {
-    pub fn new(coord: Coord) -> Cell {
-        Cell {
-            center: coord.into_point(CELL_WIDTH, CELL_HEIGHT),
-            coord: coord,
-
-            north: None,
-            east: None,
-            south: None,
-            west: None,
-        }
-    }
-
-    pub fn north(&mut self, set: bool) -> &Cell {
-        if set {
-            self.north = Some(Wall {
-                start: self.north_east(),
-                end: self.north_west(),
-            });
-        } else {
-            self.north = None;
-        }
-        self
-    }
-
-    pub fn east(&mut self, set: bool) -> &Cell {
-        if set {
-            self.east = Some(Wall {
-                start: self.north_east(),
-                end: self.south_east(),
-            });
-        } else {
-            self.east = None;
-        }
-        self
-    }
-
-    pub fn south(&mut self, set: bool) -> &Cell {
-        if set {
-            self.south = Some(Wall {
-                start: self.south_west(),
-                end: self.south_east(),
-            });
-        } else {
-            self.south = None;
-        }
-        self
-    }
-
-    pub fn west(&mut self, set: bool) -> &Cell {
-        if set {
-            self.west = Some(Wall {
-                start: self.north_west(),
-                end: self.south_west(),
-            });
-        } else {
-            self.west = None;
-        }
-        self
-    }
-
-    fn north_west(&self) -> Point {
-        [
-            self.center.x - CELL_WIDTH / 2.0,
-            self.center.y - CELL_HEIGHT / 2.0,
-        ].into()
-    }
-
-    fn north_east(&self) -> Point {
-        [
-            self.center.x + CELL_WIDTH / 2.0,
-            self.center.y - CELL_HEIGHT / 2.0,
-        ].into()
-    }
-
-    fn south_west(&self) -> Point {
-        [
-            self.center.x - CELL_WIDTH / 2.0,
-            self.center.y + CELL_HEIGHT / 2.0,
-        ].into()
-    }
-
-    fn south_east(&self) -> Point {
-        [
-            self.center.x + CELL_WIDTH / 2.0,
-            self.center.y + CELL_HEIGHT / 2.0,
-        ].into()
+    pub fn new(center: Point) -> Cell {
+        Cell { center: center }
     }
 
     pub fn render(&self, color: Option<Color>, args: &RenderArgs, gl: &mut GlGraphics) {
@@ -236,10 +197,10 @@ impl Cell {
             if let Some(color) = color {
                 Rectangle::new(color).draw(
                     centered([
-                        self.center.x,
-                        self.center.y,
-                        CELL_WIDTH / 2.0,
-                        CELL_HEIGHT / 2.0,
+                        self.center.x as f64,
+                        self.center.y as f64,
+                        CELL_WIDTH as f64 / 2.0,
+                        CELL_HEIGHT as f64 / 2.0,
                     ]),
                     &c.draw_state,
                     c.transform,
@@ -247,25 +208,13 @@ impl Cell {
                 );
             }
         });
-
-        if let Some(ref wall) = self.north {
-            wall.render(args, gl);
-        }
-        if let Some(ref wall) = self.east {
-            wall.render(args, gl);
-        }
-        if let Some(ref wall) = self.south {
-            wall.render(args, gl);
-        }
-        if let Some(ref wall) = self.west {
-            wall.render(args, gl);
-        }
     }
 }
 
 #[derive(Debug)]
 pub struct Maze {
-    pub cells: Vec<Cell>,
+    pub walls: HashSet<Wall>,
+    pub cells: HashMap<Coord, Cell>,
     pub start: Coord,
     pub end: Coord,
     pub explored: Vec<Coord>,
@@ -274,21 +223,26 @@ pub struct Maze {
 
 impl Maze {
     pub fn new() -> Maze {
-        let mut cells = Vec::new();
+        let mut walls = HashSet::new();
+        let mut cells = HashMap::new();
+
         for y in 0..MAZE_HEIGHT {
             for x in 0..MAZE_WIDTH {
-                let mut cell = Cell::new([x, y].into());
+                let coord: Coord = [x, y].into();
 
-                cell.north(true);
-                cell.south(true);
-                cell.west(true);
-                cell.east(true);
+                walls.insert(coord.north_wall());
+                walls.insert(coord.east_wall());
+                walls.insert(coord.south_wall());
+                walls.insert(coord.west_wall());
 
-                cells.push(cell);
+                let mut cell = Cell::new(coord.into());
+
+                cells.insert(coord, cell);
             }
         }
 
         Maze {
+            walls: walls,
             cells: cells,
             start: [0, 0].into(),
             end: [MAZE_WIDTH - 1, MAZE_HEIGHT - 1].into(),
@@ -302,15 +256,15 @@ impl Maze {
 
         clear(COLOR_BACKGROUND, gl);
 
-        for cell in self.cells.iter() {
+        for (coord, cell) in &self.cells {
             let color;
-            if self.highlighted.contains(&cell.coord) {
+            if self.highlighted.contains(&coord) {
                 color = Some(COLOR_HIGHLIGHT);
-            } else if cell.coord == self.start {
+            } else if *coord == self.start {
                 color = Some(COLOR_START);
-            } else if cell.coord == self.end {
+            } else if *coord == self.end {
                 color = Some(COLOR_END);
-            } else if self.explored.contains(&cell.coord) {
+            } else if self.explored.contains(&coord) {
                 color = Some(COLOR_EXPLORED);
             } else {
                 color = None;
@@ -318,14 +272,27 @@ impl Maze {
 
             cell.render(color, args, gl);
         }
+
+        for wall in &self.walls {
+            wall.render(args, gl);
+        }
     }
 
-    pub fn cell_at(&self, coord: &Coord) -> Cell {
-        self.cells[coord.flat_idx().expect("Invalid coord")].clone()
-    }
+    pub fn link(&mut self, c1: Coord, c2: Coord) -> Result<()> {
+        match c1.neighbours().iter().filter(|n| n.0 == c2).next() {
+            Some((_, direction)) => {
+                let wall = match direction {
+                    Direction::North => c1.north_wall(),
+                    Direction::East => c1.east_wall(),
+                    Direction::South => c1.south_wall(),
+                    Direction::West => c1.west_wall(),
+                };
 
-    pub fn update_cell(&mut self, cell: Cell) {
-        let idx = cell.coord.flat_idx().expect("Invalid cell");
-        self.cells[idx] = cell;
+                self.walls.remove(&wall);
+
+                Ok(())
+            }
+            None => Err(Error::NotNeighbours(c1, c2)),
+        }
     }
 }

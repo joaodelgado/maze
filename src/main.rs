@@ -7,6 +7,7 @@ extern crate piston;
 extern crate rand;
 
 mod config;
+mod errors;
 mod generator;
 mod maze;
 
@@ -17,6 +18,7 @@ use piston::input::{RenderArgs, RenderEvent, UpdateEvent};
 use piston::window::WindowSettings;
 
 use config::*;
+use errors::Result;
 use generator::{Generator, RecursiveBacktracker};
 use maze::Maze;
 
@@ -40,8 +42,9 @@ impl App {
         self.maze.render(args, gl);
     }
 
-    fn tick(&mut self) {
-        self.generator.tick(&mut self.maze);
+    fn tick(&mut self) -> Result<()> {
+        self.generator.tick(&mut self.maze)?;
+        Ok(())
     }
 }
 
@@ -67,7 +70,10 @@ fn main() {
         }
 
         if let Some(_) = e.update_args() {
-            app.tick();
+            match app.tick() {
+                Ok(()) => {}
+                Err(e) => eprintln!("[ERROR] {}", e),
+            }
         }
     }
 }
