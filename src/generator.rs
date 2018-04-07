@@ -1,21 +1,60 @@
-#![allow(unused)]
 use std::collections::HashSet;
+use std::str::FromStr;
 
 use rand::{thread_rng as random, Rng};
 
 use errors::{Error, Result};
 use maze::{Coord, Direction, Maze, Wall};
 
+#[derive(Debug)]
+pub enum GeneratorType {
+    DPS,
+    Kruskal,
+}
+
+impl GeneratorType {
+    /// A list of possible variants in `&'static str` form
+    pub fn variants() -> [&'static str; 2] {
+        ["dps", "kruskal"]
+    }
+
+    pub fn init(&self, maze: &Maze) -> Box<Generator> {
+        match *self {
+            GeneratorType::DPS => Box::new(DPS::new(maze)),
+            GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
+        }
+    }
+}
+
+impl FromStr for GeneratorType {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s.to_lowercase().as_ref() {
+            "dps" => Ok(GeneratorType::DPS),
+            "kruskal" => Ok(GeneratorType::Kruskal),
+            _ => Err(Error::UnsupportedGenerator(s.to_string())),
+        }
+    }
+}
+
 pub trait Generator {
     fn tick(&mut self, maze: &mut Maze) -> Result<()>;
 }
 
-pub struct RecursiveBacktracker {
+pub struct DPS {
     pub current: Option<Coord>,
     pub stack: Vec<Coord>,
 }
 
-impl RecursiveBacktracker {
+impl DPS {
+    fn new(maze: &Maze) -> DPS {
+        DPS {
+            current: Some(maze.start),
+            stack: vec![],
+        }
+    }
+
     fn available_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
         let current = match self.current {
             Some(ref current) => current,
@@ -36,7 +75,7 @@ impl RecursiveBacktracker {
     }
 }
 
-impl Generator for RecursiveBacktracker {
+impl Generator for DPS {
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         let current = match self.current {
             Some(ref current) => current.clone(),
@@ -99,7 +138,6 @@ enum JoinResult {
 
 impl Kruskal {
     fn join(&mut self, c1: Coord, c2: Coord) -> Result<JoinResult> {
-        // println!("Joining {} with {}", c1, c2);
         let mut c1_set = self.sets
             .drain_filter(|s| s.contains(&c1))
             .next()
@@ -110,7 +148,7 @@ impl Kruskal {
             return Ok(JoinResult::Nop);
         }
 
-        let mut c2_set = self.sets
+        let c2_set = self.sets
             .drain_filter(|s| s.contains(&c2))
             .next()
             .ok_or(Error::MissingSet(c2))?;

@@ -10,6 +10,7 @@ pub enum Error {
     NotNeighbours(Coord, Coord),
     BorderWall(Wall),
     MissingSet(Coord),
+    UnsupportedGenerator(String),
 }
 
 impl fmt::Display for Error {
@@ -20,6 +21,7 @@ impl fmt::Display for Error {
             }
             Error::BorderWall(ref wall) => write!(f, "Tried to remove non border wall {}", wall),
             Error::MissingSet(ref coord) => write!(f, "Missing set for coord {}", coord),
+            Error::UnsupportedGenerator(ref name) => write!(f, "Unsupported generator {}", name),
         }
     }
 }
@@ -30,6 +32,7 @@ impl error::Error for Error {
             Error::NotNeighbours(_, _) => "Two provided coordinates are not neighbours",
             Error::BorderWall(_) => "Tried to remove border wall",
             Error::MissingSet(_) => "Missing set for a given coord",
+            Error::UnsupportedGenerator(_) => "Unsupported generator",
         }
     }
 }

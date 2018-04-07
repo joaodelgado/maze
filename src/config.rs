@@ -1,5 +1,7 @@
 use graphics::types::Color;
 
+use generator::GeneratorType;
+
 pub const COLOR_BACKGROUND: Color = [7.0 / 255.0, 16.0 / 255.0, 19.0 / 255.0, 1.0];
 pub const COLOR_EXPLORED: Color = [14.0 / 255.0, 71.0 / 255.0, 73.0 / 255.0, 1.0];
 pub const COLOR_START: Color = [149.0 / 255.0, 198.0 / 255.0, 35.0 / 255.0, 1.0];
@@ -17,4 +19,15 @@ pub const CELL_WIDTH: u32 = WINDOW_WIDTH / MAZE_WIDTH;
 pub const CELL_HEIGHT: u32 = WINDOW_HEIGHT / MAZE_HEIGHT;
 pub const CELL_WALL_WIDTH: f64 = 1.5;
 
-pub const UPS: u64 = 120;
+#[derive(StructOpt, Debug)]
+#[structopt(name = "populate", about = "Generate packages")]
+pub struct Config {
+    /// The algorithm to used when generating the maze
+    #[structopt(short = "g", long = "generator", default_value = "dps",
+                raw(possible_values = "&GeneratorType::variants()"))]
+    pub generator: GeneratorType,
+
+    /// Updates per second
+    #[structopt(long = "ups", default_value = "120")]
+    pub ups: u64,
+}

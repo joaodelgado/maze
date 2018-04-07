@@ -1,6 +1,8 @@
 #![feature(option_filter)]
 #![feature(drain_filter)]
 
+#[macro_use]
+extern crate structopt;
 extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
@@ -12,6 +14,8 @@ mod errors;
 mod generator;
 mod maze;
 
+use structopt::StructOpt;
+
 use glutin_window::GlutinWindow as Window;
 use opengl_graphics::{GlGraphics, OpenGL};
 use piston::event_loop::{EventSettings, Events};
@@ -20,7 +24,7 @@ use piston::window::WindowSettings;
 
 use config::*;
 use errors::Result;
-use generator::{Generator, Kruskal};
+use generator::{Generator, GeneratorType};
 use maze::Maze;
 
 struct App {
@@ -29,11 +33,13 @@ struct App {
 }
 
 impl App {
-    fn recursive_backtracker() -> App {
+    fn new(generator: GeneratorType) -> App {
         let maze = Maze::new();
+        let generator = generator.init(&maze);
+
         App {
-            generator: Box::new(Kruskal::new(&maze)),
             maze: maze,
+            generator: generator,
         }
     }
 
@@ -48,6 +54,8 @@ impl App {
 }
 
 fn main() {
+    let config = Config::from_args();
+
     let opengl = OpenGL::V3_2;
 
     let mut window: Window =
@@ -58,11 +66,11 @@ fn main() {
             .expect("Error creating window");
 
     let mut gl = GlGraphics::new(opengl);
-    let mut app = App::recursive_backtracker();
+    let mut app = App::new(config.generator);
 
     let mut updating = true;
     let mut event_settings = EventSettings::new();
-    event_settings.ups = UPS;
+    event_settings.ups = config.ups;
 
     let mut events = Events::new(event_settings);
     while let Some(e) = events.next(&mut window) {
