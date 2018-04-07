@@ -1,7 +1,10 @@
+#![allow(unused)]
+use std::collections::HashSet;
+
 use rand::{thread_rng as random, Rng};
 
-use errors::Result;
-use maze::{Coord, Direction, Maze};
+use errors::{Error, Result};
+use maze::{Coord, Direction, Maze, Wall};
 
 pub trait Generator {
     fn tick(&mut self, maze: &mut Maze) -> Result<()>;
@@ -42,8 +45,8 @@ impl Generator for RecursiveBacktracker {
 
         match self.available_neighbour(&maze) {
             Some((neighbour, _)) => {
-                maze.explored.push(neighbour.clone());
-                maze.link(current, neighbour)?;
+                maze.explored.push(neighbour);
+                maze.link(&current, &neighbour)?;
                 self.stack.push(current);
                 self.current = Some(neighbour);
             }
@@ -54,6 +57,92 @@ impl Generator for RecursiveBacktracker {
             Some(ref current) => maze.highlighted = vec![current.clone()],
             None => maze.highlighted = vec![],
         };
+
+        Ok(())
+    }
+}
+
+pub struct Kruskal {
+    walls: Vec<Wall>,
+    sets: Vec<HashSet<Coord>>,
+}
+
+impl Kruskal {
+    pub fn new(maze: &Maze) -> Kruskal {
+        let mut walls = maze.walls
+            .iter()
+            .filter(|w| w.removable())
+            .map(|w| w.clone())
+            .collect::<Vec<_>>();
+
+        random().shuffle(&mut walls);
+
+        Kruskal {
+            walls: walls,
+            sets: maze.cells
+                .keys()
+                .map(|c| {
+                    let mut set = HashSet::new();
+                    set.insert(*c);
+
+                    set
+                })
+                .collect(),
+        }
+    }
+}
+
+enum JoinResult {
+    Joined,
+    Nop,
+}
+
+impl Kruskal {
+    fn join(&mut self, c1: Coord, c2: Coord) -> Result<JoinResult> {
+        // println!("Joining {} with {}", c1, c2);
+        let mut c1_set = self.sets
+            .drain_filter(|s| s.contains(&c1))
+            .next()
+            .ok_or(Error::MissingSet(c1))?;
+
+        if c1_set.contains(&c2) {
+            self.sets.push(c1_set);
+            return Ok(JoinResult::Nop);
+        }
+
+        let mut c2_set = self.sets
+            .drain_filter(|s| s.contains(&c2))
+            .next()
+            .ok_or(Error::MissingSet(c2))?;
+
+        for c in c2_set {
+            c1_set.insert(c);
+        }
+
+        self.sets.push(c1_set);
+
+        Ok(JoinResult::Joined)
+    }
+}
+
+impl Generator for Kruskal {
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        if self.walls.is_empty() {
+            maze.highlighted = vec![];
+            return Ok(());
+        }
+
+        if let Some(wall) = self.walls.pop() {
+            let (c1, c2) = maze.divided_coords(&wall);
+            maze.highlighted = vec![c1, c2];
+            match self.join(c1, c2) {
+                Err(e) => return Err(e),
+                Ok(JoinResult::Joined) => {
+                    maze.walls.remove(&wall);
+                }
+                Ok(JoinResult::Nop) => {}
+            };
+        }
 
         Ok(())
     }

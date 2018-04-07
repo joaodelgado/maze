@@ -8,10 +8,19 @@ use piston::input::RenderArgs;
 use config::*;
 use errors::{Error, Result};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Orientation {
     Horizontal,
     Vertical,
+}
+
+impl fmt::Display for Orientation {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Orientation::Horizontal => write!(f, "Horizontal"),
+            Orientation::Vertical => write!(f, "Vertical"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -34,6 +43,21 @@ impl From<[i32; 2]> for Point {
     }
 }
 
+impl Into<Coord> for Point {
+    fn into(self) -> Coord {
+        Coord {
+            x: (self.x - CELL_WIDTH as i32 / 2) / CELL_WIDTH as i32,
+            y: (self.y - CELL_HEIGHT as i32 / 2) / CELL_HEIGHT as i32,
+        }
+    }
+}
+
+impl fmt::Display for Point {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Coord {
     pub x: i32,
@@ -46,6 +70,7 @@ impl Coord {
         Wall {
             center: [as_point.x, as_point.y - CELL_HEIGHT as i32 / 2].into(),
             orientation: Orientation::Horizontal,
+            border: self.y == 0,
         }
     }
 
@@ -54,6 +79,7 @@ impl Coord {
         Wall {
             center: [as_point.x + CELL_WIDTH as i32 / 2, as_point.y].into(),
             orientation: Orientation::Vertical,
+            border: self.x == (MAZE_WIDTH - 1) as i32,
         }
     }
 
@@ -62,6 +88,7 @@ impl Coord {
         Wall {
             center: [as_point.x, as_point.y + CELL_HEIGHT as i32 / 2].into(),
             orientation: Orientation::Horizontal,
+            border: self.y == (MAZE_HEIGHT - 1) as i32,
         }
     }
 
@@ -70,6 +97,7 @@ impl Coord {
         Wall {
             center: [as_point.x - CELL_WIDTH as i32 / 2, as_point.y].into(),
             orientation: Orientation::Vertical,
+            border: self.x == 0,
         }
     }
 
@@ -144,17 +172,22 @@ impl From<[u32; 2]> for Coord {
 
 impl fmt::Display for Coord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "({}, {}", self.x, self.y)
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Wall {
     center: Point,
     orientation: Orientation,
+    border: bool,
 }
 
 impl Wall {
+    pub fn removable(&self) -> bool {
+        !self.border
+    }
+
     fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
         use graphics::line::Line;
 
@@ -177,6 +210,12 @@ impl Wall {
                 gl,
             );
         });
+    }
+}
+
+impl fmt::Display for Wall {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "[Wall {} @ {}]", self.orientation, self.center)
     }
 }
 
@@ -278,8 +317,39 @@ impl Maze {
         }
     }
 
-    pub fn link(&mut self, c1: Coord, c2: Coord) -> Result<()> {
-        match c1.neighbours().iter().filter(|n| n.0 == c2).next() {
+    pub fn divided_coords(&self, wall: &Wall) -> (Coord, Coord) {
+        let result = match wall.orientation {
+            Orientation::Horizontal => {
+                let up: Coord = Point {
+                    y: wall.center.y - CELL_HEIGHT as i32 / 2,
+                    ..wall.center
+                }.into();
+                let down: Coord = Point {
+                    y: wall.center.y + CELL_HEIGHT as i32 / 2,
+                    ..wall.center
+                }.into();
+
+                (up, down)
+            }
+            Orientation::Vertical => {
+                let left: Coord = Point {
+                    x: wall.center.x - CELL_WIDTH as i32 / 2,
+                    ..wall.center
+                }.into();
+                let right: Coord = Point {
+                    x: wall.center.x + CELL_WIDTH as i32 / 2,
+                    ..wall.center
+                }.into();
+
+                (left, right)
+            }
+        };
+
+        result
+    }
+
+    pub fn link(&mut self, c1: &Coord, c2: &Coord) -> Result<()> {
+        match c1.neighbours().iter().filter(|n| n.0 == *c2).next() {
             Some((_, direction)) => {
                 let wall = match direction {
                     Direction::North => c1.north_wall(),
@@ -288,11 +358,15 @@ impl Maze {
                     Direction::West => c1.west_wall(),
                 };
 
+                if !wall.removable() {
+                    return Err(Error::BorderWall(wall));
+                }
+
                 self.walls.remove(&wall);
 
                 Ok(())
             }
-            None => Err(Error::NotNeighbours(c1, c2)),
+            None => Err(Error::NotNeighbours(*c1, *c2)),
         }
     }
 }

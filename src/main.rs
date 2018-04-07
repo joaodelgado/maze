@@ -1,4 +1,5 @@
 #![feature(option_filter)]
+#![feature(drain_filter)]
 
 extern crate glutin_window;
 extern crate graphics;
@@ -19,7 +20,7 @@ use piston::window::WindowSettings;
 
 use config::*;
 use errors::Result;
-use generator::{Generator, RecursiveBacktracker};
+use generator::{Generator, Kruskal};
 use maze::Maze;
 
 struct App {
@@ -29,12 +30,10 @@ struct App {
 
 impl App {
     fn recursive_backtracker() -> App {
+        let maze = Maze::new();
         App {
-            maze: Maze::new(),
-            generator: Box::new(RecursiveBacktracker {
-                current: Some([0, 0].into()),
-                stack: Vec::new(),
-            }),
+            generator: Box::new(Kruskal::new(&maze)),
+            maze: maze,
         }
     }
 
@@ -61,10 +60,16 @@ fn main() {
     let mut gl = GlGraphics::new(opengl);
     let mut app = App::recursive_backtracker();
 
+    let mut updating = true;
     let mut event_settings = EventSettings::new();
     event_settings.ups = UPS;
+
     let mut events = Events::new(event_settings);
     while let Some(e) = events.next(&mut window) {
+        if !updating {
+            return;
+        }
+
         if let Some(r) = e.render_args() {
             app.render(&r, &mut gl);
         }
@@ -72,7 +77,10 @@ fn main() {
         if let Some(_) = e.update_args() {
             match app.tick() {
                 Ok(()) => {}
-                Err(e) => eprintln!("[ERROR] {}", e),
+                Err(e) => {
+                    updating = false;
+                    eprintln!("[ERROR] {}", e);
+                }
             }
         }
     }

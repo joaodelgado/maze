@@ -13,8 +13,8 @@ pub const WINDOW_HEIGHT: u32 = 720;
 pub const MAZE_WIDTH: u32 = WINDOW_WIDTH / 40;
 pub const MAZE_HEIGHT: u32 = WINDOW_HEIGHT / 40;
 
-pub const CELL_WIDTH: f64 = WINDOW_WIDTH as f64 / MAZE_WIDTH as f64;
-pub const CELL_HEIGHT: f64 = WINDOW_HEIGHT as f64 / MAZE_HEIGHT as f64;
+pub const CELL_WIDTH: u32 = WINDOW_WIDTH / MAZE_WIDTH;
+pub const CELL_HEIGHT: u32 = WINDOW_HEIGHT / MAZE_HEIGHT;
 pub const CELL_WALL_WIDTH: f64 = 1.5;
 
-pub const UPS: u64 = 60;
+pub const UPS: u64 = 120;
