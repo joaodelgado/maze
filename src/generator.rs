@@ -10,18 +10,20 @@ use maze::{Coord, Direction, Maze, Wall};
 pub enum GeneratorType {
     DPS,
     Kruskal,
+    Prim,
 }
 
 impl GeneratorType {
     /// A list of possible variants in `&'static str` form
-    pub fn variants() -> [&'static str; 2] {
-        ["dps", "kruskal"]
+    pub fn variants() -> [&'static str; 3] {
+        ["dps", "kruskal", "prim"]
     }
 
     pub fn init(&self, maze: &Maze) -> Box<Generator> {
         match *self {
             GeneratorType::DPS => Box::new(DPS::new(maze)),
             GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
+            GeneratorType::Prim => Box::new(Prim::new(maze)),
         }
     }
 }
@@ -33,6 +35,7 @@ impl FromStr for GeneratorType {
         match s.to_lowercase().as_ref() {
             "dps" => Ok(GeneratorType::DPS),
             "kruskal" => Ok(GeneratorType::Kruskal),
+            "prim" => Ok(GeneratorType::Prim),
             _ => Err(Error::UnsupportedGenerator(s.to_string())),
         }
     }
@@ -101,6 +104,11 @@ impl Generator for DPS {
     }
 }
 
+enum JoinResult {
+    Joined,
+    Nop,
+}
+
 pub struct Kruskal {
     walls: Vec<Wall>,
     sets: Vec<HashSet<Coord>>,
@@ -129,14 +137,7 @@ impl Kruskal {
                 .collect(),
         }
     }
-}
 
-enum JoinResult {
-    Joined,
-    Nop,
-}
-
-impl Kruskal {
     fn join(&mut self, c1: Coord, c2: Coord) -> Result<JoinResult> {
         let mut c1_set = self.sets
             .drain_filter(|s| s.contains(&c1))
@@ -185,6 +186,69 @@ impl Generator for Kruskal {
                 }
                 Ok(JoinResult::Nop) => {}
             };
+        }
+
+        Ok(())
+    }
+}
+
+pub struct Prim {
+    walls: HashSet<Wall>,
+}
+
+impl Prim {
+    pub fn new(maze: &Maze) -> Prim {
+        let mut prim = Prim {
+            walls: HashSet::new(),
+        };
+
+        prim.extend_walls(&maze.start, maze);
+
+        prim
+    }
+
+    fn extend_walls(&mut self, c: &Coord, maze: &Maze) {
+        for wall in c.walls()
+            .iter()
+            .filter(|w| maze.walls.contains(w))
+            .filter(|w| w.removable())
+        {
+            self.walls.insert(wall.clone());
+        }
+    }
+
+    fn random_wall(&self) -> Option<Wall> {
+        if self.walls.is_empty() {
+            return None;
+        }
+        let wall_list: Vec<_> = self.walls.iter().collect();
+        // Unwrap is safe here because of the is_empty check above
+        let wall = random().choose(&wall_list).unwrap();
+
+        Some(*wall.clone())
+    }
+}
+
+impl Generator for Prim {
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlighted.clear();
+
+        // Unwrap is safe here because of the is_empty check above
+        if let Some(wall) = self.random_wall() {
+            let (c1, c2) = maze.divided_coords(&wall);
+            maze.highlighted.insert(c1);
+            maze.highlighted.insert(c2);
+
+            if !maze.explored.contains(&c1) {
+                maze.explored.insert(c1);
+                self.extend_walls(&c1, &maze);
+                maze.walls.remove(&wall);
+            } else if !maze.explored.contains(&c2) {
+                maze.explored.insert(c2);
+                self.extend_walls(&c2, &maze);
+                maze.walls.remove(&wall);
+            }
+            self.walls.remove(&wall);
         }
 
         Ok(())

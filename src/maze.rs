@@ -65,6 +65,15 @@ pub struct Coord {
 }
 
 impl Coord {
+    pub fn walls(&self) -> [Wall; 4] {
+        [
+            self.north_wall(),
+            self.east_wall(),
+            self.south_wall(),
+            self.west_wall(),
+        ]
+    }
+
     pub fn north_wall(&self) -> Wall {
         let as_point: Point = (*self).into();
         Wall {
