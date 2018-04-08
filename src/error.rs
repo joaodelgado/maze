@@ -11,6 +11,8 @@ pub enum Error {
     BorderWall(Wall),
     MissingSet(Coord),
     UnsupportedGenerator(String),
+    UnsupportedSolver(String),
+    ImpossibleMaze,
 }
 
 impl fmt::Display for Error {
@@ -22,6 +24,8 @@ impl fmt::Display for Error {
             Error::BorderWall(ref wall) => write!(f, "Tried to remove non border wall {}", wall),
             Error::MissingSet(ref coord) => write!(f, "Missing set for coord {}", coord),
             Error::UnsupportedGenerator(ref name) => write!(f, "Unsupported generator {}", name),
+            Error::UnsupportedSolver(ref name) => write!(f, "Unsupported solver {}", name),
+            Error::ImpossibleMaze => write!(f, "Impossible maze"),
         }
     }
 }
@@ -33,6 +37,8 @@ impl error::Error for Error {
             Error::BorderWall(_) => "Tried to remove border wall",
             Error::MissingSet(_) => "Missing set for a given coord",
             Error::UnsupportedGenerator(_) => "Unsupported generator",
+            Error::UnsupportedSolver(_) => "Unsupported solver",
+            Error::ImpossibleMaze => "Impossible maze",
         }
     }
 }

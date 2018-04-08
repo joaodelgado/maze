@@ -13,6 +13,7 @@ mod config;
 mod error;
 mod generator;
 mod maze;
+mod solver;
 
 use structopt::StructOpt;
 
@@ -26,20 +27,31 @@ use config::Config;
 use error::Result;
 use generator::Generator;
 use maze::Maze;
+use solver::Solver;
+
+enum AppMode {
+    Generating,
+    Solving,
+}
 
 struct App<'a> {
     maze: Maze<'a>,
+    mode: AppMode,
     generator: Box<Generator>,
+    solver: Box<Solver>,
 }
 
 impl<'a> App<'a> {
     fn new(config: &Config) -> App {
         let maze = Maze::new(&config);
         let generator = config.generator().init(&maze);
+        let solver = config.solver().init(&maze);
 
         App {
             maze: maze,
+            mode: AppMode::Generating,
             generator: generator,
+            solver: solver,
         }
     }
 
@@ -48,14 +60,31 @@ impl<'a> App<'a> {
     }
 
     fn tick(&mut self) -> Result<()> {
-        if !self.generator.is_done() {
-            self.generator.tick(&mut self.maze)?;
-        } else {
+        match self.mode {
+            AppMode::Generating => self.tick_gen()?,
+            AppMode::Solving => self.tick_solve()?,
+        }
+        Ok(())
+    }
+
+    fn tick_gen(&mut self) -> Result<()> {
+        if self.generator.is_done() {
             self.maze.highlight_bright.clear();
             self.maze.highlight_medium.clear();
             self.maze.highlight_dark.clear();
             self.maze.explored.clear();
+            self.mode = AppMode::Solving;
+        } else {
+            self.generator.tick(&mut self.maze)?;
         }
+        Ok(())
+    }
+
+    fn tick_solve(&mut self) -> Result<()> {
+        if !self.solver.is_done() {
+            self.solver.tick(&mut self.maze)?;
+        }
+
         Ok(())
     }
 }

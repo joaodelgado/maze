@@ -85,17 +85,16 @@ impl Generator for DFS {
     }
 
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlight_bright.clear();
+
         let current = match self.current {
             Some(ref current) => current.clone(),
             None => return Ok(()),
         };
-
-        maze.highlight_bright.clear();
-        maze.highlight_bright.insert(current);
+        maze.explored.insert(current);
 
         match self.available_neighbour(&maze) {
             Some((neighbour, _)) => {
-                maze.explored.insert(neighbour);
                 maze.link(&current, &neighbour)?;
                 self.stack.push(current);
                 self.current = Some(neighbour);
@@ -106,6 +105,7 @@ impl Generator for DFS {
             }
         }
 
+        maze.highlight_bright.insert(current);
         Ok(())
     }
 }

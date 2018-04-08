@@ -456,6 +456,15 @@ impl<'a> Maze<'a> {
         coord.walls(self.config)
     }
 
+    pub fn wall(&self, coord: &Coord, direction: &Direction) -> Wall {
+        match direction {
+            Direction::North => self.north_wall(coord),
+            Direction::East => self.east_wall(coord),
+            Direction::South => self.south_wall(coord),
+            Direction::West => self.west_wall(coord),
+        }
+    }
+
     pub fn north_wall(&self, coord: &Coord) -> Wall {
         coord.north_wall(self.config)
     }
@@ -474,5 +483,16 @@ impl<'a> Maze<'a> {
 
     pub fn neighbours(&self, coord: &Coord) -> Vec<(Coord, Direction)> {
         coord.neighbours(self.config.maze_width(), self.config.maze_height())
+    }
+
+    pub fn connected_neighbours(&self, coord: &Coord) -> Vec<(Coord, Direction)> {
+        coord
+            .neighbours(self.config.maze_width(), self.config.maze_height())
+            .into_iter()
+            .filter(|(_, d)| {
+                let wall = self.wall(coord, d);
+                !self.walls.contains(&wall)
+            })
+            .collect()
     }
 }

@@ -1,6 +1,7 @@
 use graphics::types::Color;
 
 use generator::GeneratorType;
+use solver::SolverType;
 
 pub const COLOR_BACKGROUND: Color = [7.0 / 255.0, 16.0 / 255.0, 19.0 / 255.0, 1.0];
 pub const COLOR_START: Color = [149.0 / 255.0, 198.0 / 255.0, 35.0 / 255.0, 1.0];
@@ -22,6 +23,11 @@ pub struct Config {
     #[structopt(short = "g", long = "generator", default_value = "dfs",
                 raw(possible_values = "&GeneratorType::variants()"))]
     generator: GeneratorType,
+
+    /// The algorithm to used when solving the maze
+    #[structopt(short = "s", long = "solver", default_value = "dfs",
+                raw(possible_values = "&SolverType::variants()"))]
+    solver: SolverType,
 
     /// Updates per second
     #[structopt(long = "ups", default_value = "60")]
@@ -48,6 +54,11 @@ impl Config {
     #[inline]
     pub fn generator(&self) -> GeneratorType {
         self.generator
+    }
+
+    #[inline]
+    pub fn solver(&self) -> SolverType {
+        self.solver
     }
 
     #[inline]
