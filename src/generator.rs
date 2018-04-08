@@ -8,7 +8,7 @@ use maze::{Coord, Direction, Maze, Wall};
 
 #[derive(Debug)]
 pub enum GeneratorType {
-    DPS,
+    DFS,
     Kruskal,
     Prim,
 }
@@ -16,12 +16,12 @@ pub enum GeneratorType {
 impl GeneratorType {
     /// A list of possible variants in `&'static str` form
     pub fn variants() -> [&'static str; 3] {
-        ["dps", "kruskal", "prim"]
+        ["dfs", "kruskal", "prim"]
     }
 
     pub fn init(&self, maze: &Maze) -> Box<Generator> {
         match *self {
-            GeneratorType::DPS => Box::new(DPS::new(maze)),
+            GeneratorType::DFS => Box::new(DFS::new(maze)),
             GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
             GeneratorType::Prim => Box::new(Prim::new(maze)),
         }
@@ -33,7 +33,7 @@ impl FromStr for GeneratorType {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_ref() {
-            "dps" => Ok(GeneratorType::DPS),
+            "dfs" => Ok(GeneratorType::DFS),
             "kruskal" => Ok(GeneratorType::Kruskal),
             "prim" => Ok(GeneratorType::Prim),
             _ => Err(Error::UnsupportedGenerator(s.to_string())),
@@ -45,14 +45,14 @@ pub trait Generator {
     fn tick(&mut self, maze: &mut Maze) -> Result<()>;
 }
 
-pub struct DPS {
+pub struct DFS {
     pub current: Option<Coord>,
     pub stack: Vec<Coord>,
 }
 
-impl DPS {
-    fn new(maze: &Maze) -> DPS {
-        DPS {
+impl DFS {
+    fn new(maze: &Maze) -> DFS {
+        DFS {
             current: Some(maze.start),
             stack: vec![],
         }
@@ -78,7 +78,7 @@ impl DPS {
     }
 }
 
-impl Generator for DPS {
+impl Generator for DFS {
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         let current = match self.current {
             Some(ref current) => current.clone(),

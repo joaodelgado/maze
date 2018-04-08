@@ -23,11 +23,11 @@ pub const CELL_WALL_WIDTH: f64 = 1.5;
 #[structopt(name = "populate", about = "Generate packages")]
 pub struct Config {
     /// The algorithm to used when generating the maze
-    #[structopt(short = "g", long = "generator", default_value = "dps",
+    #[structopt(short = "g", long = "generator", default_value = "dfs",
                 raw(possible_values = "&GeneratorType::variants()"))]
     pub generator: GeneratorType,
 
     /// Updates per second
-    #[structopt(long = "ups", default_value = "120")]
+    #[structopt(long = "ups", default_value = "60")]
     pub ups: u64,
 }
