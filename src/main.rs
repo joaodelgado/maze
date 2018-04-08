@@ -39,20 +39,22 @@ struct App<'a> {
     mode: AppMode,
     generator: Box<Generator>,
     solver: Box<Solver>,
+    config: &'a Config,
 }
 
 impl<'a> App<'a> {
-    fn new(config: &Config) -> App {
+    fn new(config: &'a Config) -> Result<App<'a>> {
         let maze = Maze::new(&config);
         let generator = config.generator().init(&maze);
         let solver = config.solver().init(&maze);
 
-        App {
+        Ok(App {
             maze: maze,
             mode: AppMode::Generating,
             generator: generator,
             solver: solver,
-        }
+            config: config,
+        })
     }
 
     fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
@@ -68,6 +70,12 @@ impl<'a> App<'a> {
     }
 
     fn tick_gen(&mut self) -> Result<()> {
+        if !self.config.interactive_gen() {
+            while !self.generator.is_done() {
+                self.generator.tick(&mut self.maze)?;
+            }
+        }
+
         if self.generator.is_done() {
             self.maze.highlight_bright.clear();
             self.maze.highlight_medium.clear();
@@ -81,6 +89,12 @@ impl<'a> App<'a> {
     }
 
     fn tick_solve(&mut self) -> Result<()> {
+        if !self.config.interactive_solve() {
+            while !self.solver.is_done() {
+                self.solver.tick(&mut self.maze)?;
+            }
+        }
+
         if !self.solver.is_done() {
             self.solver.tick(&mut self.maze)?;
         }
@@ -94,7 +108,11 @@ fn main() {
     let opengl = OpenGL::V3_2;
 
     let mut window: Window = WindowSettings::new(
-        "Space filling circles",
+        format!(
+            "Mazes! Generator: {:?} Solver: {:?}",
+            config.generator(),
+            config.solver()
+        ),
         [config.window_width(), config.window_height()],
     ).opengl(opengl)
         .exit_on_esc(false)
@@ -102,7 +120,13 @@ fn main() {
         .expect("Error creating window");
 
     let mut gl = GlGraphics::new(opengl);
-    let mut app = App::new(&config);
+    let mut app = match App::new(&config) {
+        Ok(app) => app,
+        Err(e) => {
+            eprintln!("[ERROR] {}", e);
+            return;
+        }
+    };
 
     let mut updating = true;
     let mut event_settings = EventSettings::new();
@@ -112,7 +136,7 @@ fn main() {
     let mut events = Events::new(event_settings);
     while let Some(e) = events.next(&mut window) {
         if !updating {
-            return;
+            continue;
         }
 
         if let Some(r) = e.render_args() {

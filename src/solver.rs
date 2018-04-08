@@ -8,18 +8,20 @@ use maze::{Coord, Direction, Maze};
 pub enum SolverType {
     DFS,
     BFS,
+    Dijkstra,
 }
 
 impl SolverType {
     /// A list of possible variants in `&'static str` form
-    pub fn variants() -> [&'static str; 2] {
-        ["dfs", "bfs"]
+    pub fn variants() -> [&'static str; 3] {
+        ["dfs", "bfs", "dijkstra"]
     }
 
     pub fn init(&self, maze: &Maze) -> Box<Solver> {
         match *self {
             SolverType::DFS => Box::new(DFS::new(maze)),
             SolverType::BFS => Box::new(BFS::new(maze)),
+            SolverType::Dijkstra => Box::new(Dijkstra::new(maze)),
         }
     }
 }
@@ -31,6 +33,7 @@ impl FromStr for SolverType {
         match s.to_lowercase().as_ref() {
             "dfs" => Ok(SolverType::DFS),
             "bfs" => Ok(SolverType::BFS),
+            "dijkstra" => Ok(SolverType::Dijkstra),
             _ => Err(Error::UnsupportedSolver(s.to_string())),
         }
     }
@@ -99,21 +102,21 @@ impl Solver for DFS {
 }
 
 #[derive(Clone)]
-struct HierarchicalCoord {
+struct BFSNode {
     coord: Coord,
-    previous: Option<Box<HierarchicalCoord>>,
+    previous: Option<Box<BFSNode>>,
 }
 
 pub struct BFS {
-    current: HierarchicalCoord,
+    current: BFSNode,
     goal: Coord,
-    queue: VecDeque<HierarchicalCoord>,
+    queue: VecDeque<BFSNode>,
 }
 
 impl BFS {
     fn new(maze: &Maze) -> BFS {
         BFS {
-            current: HierarchicalCoord {
+            current: BFSNode {
                 coord: maze.start,
                 previous: None,
             },
@@ -140,7 +143,7 @@ impl BFS {
             .collect()
     }
 
-    fn highlight_path_from_cell(hc: &HierarchicalCoord, maze: &mut Maze) {
+    fn highlight_path_from_cell(hc: &BFSNode, maze: &mut Maze) {
         maze.highlight_medium.insert(hc.coord);
         if let Some(ref previous) = hc.previous {
             BFS::highlight_path_from_cell(&previous, maze);
@@ -162,15 +165,116 @@ impl Solver for BFS {
         maze.highlight_bright.clear();
 
         for (neighbour, _) in self.available_neighbours(maze).into_iter() {
-            self.queue.push_back(HierarchicalCoord {
+            self.queue.push_back(BFSNode {
                 coord: neighbour,
                 previous: Some(Box::new(self.current.clone())),
             });
+            maze.highlight_dark.insert(neighbour);
         }
 
         self.current = self.queue.pop_front().ok_or(Error::ImpossibleMaze)?;
+        maze.highlight_dark.remove(&self.current.coord);
 
         maze.explored.insert(self.current.coord);
+
+        maze.highlight_bright.insert(self.current.coord);
+        self.highlight_path(maze);
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct DijkstraNode {
+    coord: Coord,
+    dist: u64,
+    previous: Option<Box<DijkstraNode>>,
+}
+
+#[derive(Debug)]
+pub struct Dijkstra {
+    current: DijkstraNode,
+    goal: Coord,
+    queue: Vec<DijkstraNode>,
+}
+
+impl Dijkstra {
+    fn new(maze: &Maze) -> Dijkstra {
+        Dijkstra {
+            current: DijkstraNode {
+                coord: maze.start,
+                dist: 0,
+                previous: None,
+            },
+            goal: maze.end,
+            queue: vec![],
+        }
+    }
+
+    fn available_neighbours(&self, maze: &Maze) -> Vec<(Coord, Direction)> {
+        if maze.end == self.current.coord {
+            return Vec::new();
+        }
+
+        maze.connected_neighbours(&self.current.coord)
+            .into_iter()
+            .filter(|(c, _)| !maze.explored.contains(&c))
+            .filter(|(c, _)| {
+                !self.queue
+                    .iter()
+                    .filter(|hc| hc.coord == *c)
+                    .next()
+                    .is_some()
+            })
+            .collect()
+    }
+
+    fn highlight_path_from_cell(hc: &DijkstraNode, maze: &mut Maze) {
+        maze.highlight_medium.insert(hc.coord);
+        if let Some(ref previous) = hc.previous {
+            Dijkstra::highlight_path_from_cell(&previous, maze);
+        }
+    }
+
+    fn highlight_path(&self, maze: &mut Maze) {
+        maze.highlight_medium.clear();
+        Dijkstra::highlight_path_from_cell(&self.current, maze);
+    }
+}
+
+impl Solver for Dijkstra {
+    fn is_done(&self) -> bool {
+        self.goal == self.current.coord
+    }
+
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlight_bright.clear();
+
+        maze.explored.insert(self.current.coord);
+        for (neighbour, _) in self.available_neighbours(maze).into_iter() {
+            let dist_to_neighbour = self.current.dist + 1;
+
+            let new_neighbour = DijkstraNode {
+                coord: neighbour,
+                dist: dist_to_neighbour,
+                previous: Some(Box::new(self.current.clone())),
+            };
+
+            maze.highlight_dark.insert(neighbour);
+            match self.queue
+                .binary_search_by_key(&new_neighbour.dist, |n| n.dist)
+            {
+                Ok(pos) | Err(pos) => {
+                    self.queue.insert(pos, new_neighbour);
+                }
+            }
+        }
+
+        if self.queue.is_empty() {
+            return Err(Error::ImpossibleMaze);
+        }
+        self.current = self.queue.remove(0);
+        maze.highlight_dark.remove(&self.current.coord);
 
         maze.highlight_bright.insert(self.current.coord);
         self.highlight_path(maze);

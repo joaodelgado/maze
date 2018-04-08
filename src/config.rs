@@ -48,6 +48,14 @@ pub struct Config {
     /// The height of the maze in cells
     #[structopt(short = "h", long = "height", default_value = "18")]
     height: u32,
+
+    /// If provided, the maze generation is done without any visualization
+    #[structopt(long = "no-interactive-gen")]
+    no_interactive_gen: bool,
+
+    /// If provided, the maze solving is done without any visualization
+    #[structopt(long = "no-interactive-solve")]
+    no_interactive_solve: bool,
 }
 
 impl Config {
@@ -99,5 +107,15 @@ impl Config {
     #[inline]
     pub fn window_height(&self) -> u32 {
         self.cell_height() * self.maze_height()
+    }
+
+    #[inline]
+    pub fn interactive_gen(&self) -> bool {
+        return !self.no_interactive_gen;
+    }
+
+    #[inline]
+    pub fn interactive_solve(&self) -> bool {
+        return !self.no_interactive_solve;
     }
 }

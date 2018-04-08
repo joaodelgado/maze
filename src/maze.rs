@@ -67,6 +67,10 @@ pub struct Coord {
 }
 
 impl Coord {
+    pub fn manhattan_dist(&self, other: &Coord) -> u32 {
+        ((self.x - other.x).abs() + (self.y - other.y).abs()) as u32
+    }
+
     pub fn walls(&self, config: &Config) -> [Wall; 4] {
         [
             self.north_wall(config),
