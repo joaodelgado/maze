@@ -203,66 +203,66 @@ impl Generator for Kruskal {
 }
 
 pub struct Prim {
-    walls: HashSet<Wall>,
+    cells: HashSet<Coord>,
 }
 
 impl Prim {
     pub fn new(maze: &Maze) -> Prim {
-        let mut prim = Prim {
-            walls: HashSet::new(),
-        };
+        let mut cells = HashSet::new();
+        cells.insert(maze.start);
 
-        prim.extend_walls(&maze.start, maze);
-
-        prim
+        Prim { cells: cells }
     }
 
-    fn extend_walls(&mut self, c: &Coord, maze: &Maze) {
-        for wall in maze.walls(c)
-            .iter()
-            .filter(|w| maze.walls.contains(w))
-            .filter(|w| w.removable())
-        {
-            self.walls.insert(wall.clone());
-        }
-    }
-
-    fn random_wall(&self) -> Option<Wall> {
-        if self.walls.is_empty() {
+    fn random_cell(&mut self) -> Option<Coord> {
+        if self.cells.is_empty() {
             return None;
         }
-        let wall_list: Vec<_> = self.walls.iter().collect();
+        let cell_list: Vec<_> = self.cells.iter().collect();
         // Unwrap is safe here because of the is_empty check above
-        let wall = random().choose(&wall_list).unwrap();
+        let cell = random().choose(&cell_list).unwrap();
 
-        Some(*wall.clone())
+        Some(**cell)
     }
 }
 
 impl Generator for Prim {
     fn is_done(&self) -> bool {
-        self.walls.is_empty()
+        self.cells.is_empty()
     }
 
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         maze.highlight_bright.clear();
 
-        // Unwrap is safe here because of the is_empty check above
-        if let Some(wall) = self.random_wall() {
-            let (c1, c2) = maze.divided_coords(&wall);
-            maze.highlight_bright.insert(c1);
-            maze.highlight_bright.insert(c2);
+        if let Some(cell) = self.random_cell() {
+            maze.explored.insert(cell);
+            maze.highlight_medium.remove(&cell);
+            maze.highlight_bright.insert(cell);
+            self.cells.remove(&cell);
 
-            if !maze.explored.contains(&c1) {
-                maze.explored.insert(c1);
-                self.extend_walls(&c1, &maze);
-                maze.walls.remove(&wall);
-            } else if !maze.explored.contains(&c2) {
-                maze.explored.insert(c2);
-                self.extend_walls(&c2, &maze);
+            let explored_neighbours: Vec<_> = maze.neighbours(&cell)
+                .into_iter()
+                .filter(|(n, _)| maze.explored.contains(n))
+                .collect();
+            let unknown_neighbours: Vec<_> = maze.neighbours(&cell)
+                .into_iter()
+                .filter(|(n, _)| !maze.explored.contains(n))
+                .collect();
+
+            if let Some((_, direction)) = random().choose(&explored_neighbours) {
+                let wall = match direction {
+                    Direction::North => maze.north_wall(&cell),
+                    Direction::East => maze.east_wall(&cell),
+                    Direction::South => maze.south_wall(&cell),
+                    Direction::West => maze.west_wall(&cell),
+                };
                 maze.walls.remove(&wall);
             }
-            self.walls.remove(&wall);
+
+            for (unknown_neighbour, _) in unknown_neighbours {
+                maze.highlight_medium.insert(unknown_neighbour);
+                self.cells.insert(unknown_neighbour);
+            }
         }
 
         Ok(())

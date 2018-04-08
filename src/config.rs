@@ -27,6 +27,10 @@ pub struct Config {
     #[structopt(long = "ups", default_value = "60")]
     ups: u64,
 
+    /// Frames per second
+    #[structopt(long = "fps", default_value = "60")]
+    fps: u64,
+
     /// The size of each sell in pixels
     #[structopt(long = "cell-size", default_value = "40")]
     cell_size: u32,
@@ -49,6 +53,11 @@ impl Config {
     #[inline]
     pub fn ups(&self) -> u64 {
         self.ups
+    }
+
+    #[inline]
+    pub fn fps(&self) -> u64 {
+        self.fps
     }
 
     #[inline]

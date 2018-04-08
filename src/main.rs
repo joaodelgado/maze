@@ -78,6 +78,7 @@ fn main() {
     let mut updating = true;
     let mut event_settings = EventSettings::new();
     event_settings.ups = config.ups();
+    event_settings.max_fps = config.fps();
 
     let mut events = Events::new(event_settings);
     while let Some(e) = events.next(&mut window) {
