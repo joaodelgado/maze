@@ -6,7 +6,7 @@ use rand::{thread_rng as random, Rng};
 use errors::{Error, Result};
 use maze::{Coord, Direction, Maze, Wall};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum GeneratorType {
     DFS,
     Kruskal,
@@ -68,7 +68,7 @@ impl DFS {
             return None;
         }
 
-        let mut neighbours = current.neighbours();
+        let mut neighbours = maze.neighbours(current);
         random().shuffle(&mut neighbours);
 
         neighbours
@@ -208,7 +208,7 @@ impl Prim {
     }
 
     fn extend_walls(&mut self, c: &Coord, maze: &Maze) {
-        for wall in c.walls()
+        for wall in maze.walls(c)
             .iter()
             .filter(|w| maze.walls.contains(w))
             .filter(|w| w.removable())

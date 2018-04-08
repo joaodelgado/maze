@@ -22,20 +22,20 @@ use piston::event_loop::{EventSettings, Events};
 use piston::input::{RenderArgs, RenderEvent, UpdateEvent};
 use piston::window::WindowSettings;
 
-use config::*;
+use config::Config;
 use errors::Result;
-use generator::{Generator, GeneratorType};
+use generator::Generator;
 use maze::Maze;
 
-struct App {
-    maze: Maze,
+struct App<'a> {
+    maze: Maze<'a>,
     generator: Box<Generator>,
 }
 
-impl App {
-    fn new(generator: GeneratorType) -> App {
-        let maze = Maze::new();
-        let generator = generator.init(&maze);
+impl<'a> App<'a> {
+    fn new(config: &Config) -> App {
+        let maze = Maze::new(&config);
+        let generator = config.generator().init(&maze);
 
         App {
             maze: maze,
@@ -55,22 +55,22 @@ impl App {
 
 fn main() {
     let config = Config::from_args();
-
     let opengl = OpenGL::V3_2;
 
-    let mut window: Window =
-        WindowSettings::new("Space filling circles", [WINDOW_WIDTH, WINDOW_HEIGHT])
-            .opengl(opengl)
-            .exit_on_esc(false)
-            .build()
-            .expect("Error creating window");
+    let mut window: Window = WindowSettings::new(
+        "Space filling circles",
+        [config.window_width(), config.window_height()],
+    ).opengl(opengl)
+        .exit_on_esc(false)
+        .build()
+        .expect("Error creating window");
 
     let mut gl = GlGraphics::new(opengl);
-    let mut app = App::new(config.generator);
+    let mut app = App::new(&config);
 
     let mut updating = true;
     let mut event_settings = EventSettings::new();
-    event_settings.ups = config.ups;
+    event_settings.ups = config.ups();
 
     let mut events = Events::new(event_settings);
     while let Some(e) = events.next(&mut window) {
