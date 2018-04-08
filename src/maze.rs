@@ -94,9 +94,10 @@ impl Coord {
 
     pub fn north_wall(&self, config: &Config) -> Wall {
         let as_point: Point = self.into_point(config.cell_width(), config.cell_height());
-        let offset = match config.cell_height() % 2 == 0 {
-            true => config.cell_height() as i32 / 2,
-            false => (config.cell_height() + 1) as i32 / 2,
+        let offset = if config.cell_height() % 2 == 0 {
+            config.cell_height() as i32 / 2
+        } else {
+            (config.cell_height() + 1) as i32 / 2
         };
         Wall {
             center: [as_point.x, as_point.y - offset].into(),
@@ -128,10 +129,12 @@ impl Coord {
 
     pub fn west_wall(&self, config: &Config) -> Wall {
         let as_point: Point = self.into_point(config.cell_width(), config.cell_height());
-        let offset = match config.cell_width() % 2 == 0 {
-            true => config.cell_width() as i32 / 2,
-            false => (config.cell_width() + 1) as i32 / 2,
+        let offset = if config.cell_width() % 2 == 0 {
+            config.cell_width() as i32 / 2
+        } else {
+            (config.cell_width() + 1) as i32 / 2
         };
+
         Wall {
             center: [as_point.x - offset, as_point.y].into(),
             orientation: Orientation::Vertical,
@@ -154,7 +157,7 @@ impl Coord {
 
     pub fn neighbour(
         &self,
-        direction: Direction,
+        direction: &Direction,
         maze_width: u32,
         maze_height: u32,
     ) -> Option<Coord> {
@@ -187,19 +190,19 @@ impl Coord {
     pub fn neighbours(&self, maze_width: u32, maze_height: u32) -> Vec<(Coord, Direction)> {
         vec![
             (
-                self.neighbour(Direction::North, maze_width, maze_height),
+                self.neighbour(&Direction::North, maze_width, maze_height),
                 Direction::North,
             ),
             (
-                self.neighbour(Direction::East, maze_width, maze_height),
+                self.neighbour(&Direction::East, maze_width, maze_height),
                 Direction::East,
             ),
             (
-                self.neighbour(Direction::South, maze_width, maze_height),
+                self.neighbour(&Direction::South, maze_width, maze_height),
                 Direction::South,
             ),
             (
-                self.neighbour(Direction::West, maze_width, maze_height),
+                self.neighbour(&Direction::West, maze_width, maze_height),
                 Direction::West,
             ),
         ].into_iter()
@@ -229,7 +232,7 @@ impl FromStr for Coord {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let coords: Vec<&str> = s.trim_matches(|p| p == '(' || p == ')')
-            .split(",")
+            .split(',')
             .collect();
 
         let x_fromstr = coords[0].parse::<i32>()?;
@@ -264,10 +267,7 @@ impl Wall {
     fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
         use graphics::line::Line;
 
-        let offset = match self.size % 2 == 0 {
-            true => 0,
-            false => 1,
-        };
+        let offset = if self.size % 2 == 0 { 0 } else { 1 };
 
         let (start, end): (Point, Point) = match self.orientation {
             Orientation::Horizontal => (
@@ -288,7 +288,12 @@ impl Wall {
 
         gl.draw(args.viewport(), |c, gl| {
             Line::new(COLOR_WALL, CELL_WALL_WIDTH / 2.0).draw(
-                [start.x as f64, start.y as f64, end.x as f64, end.y as f64],
+                [
+                    f64::from(start.x),
+                    f64::from(start.y),
+                    f64::from(end.x),
+                    f64::from(end.y),
+                ],
                 &c.draw_state,
                 c.transform,
                 gl,
@@ -313,9 +318,9 @@ pub struct Cell {
 impl Cell {
     pub fn new(center: Point, width: u32, height: u32) -> Cell {
         Cell {
-            center: center,
-            width: width as f64,
-            height: height as f64,
+            center,
+            width: f64::from(width),
+            height: f64::from(height),
         }
     }
 
@@ -326,8 +331,8 @@ impl Cell {
             if let Some(color) = color {
                 Rectangle::new(color).draw(
                     centered([
-                        self.center.x as f64,
-                        self.center.y as f64,
+                        f64::from(self.center.x),
+                        f64::from(self.center.y),
                         self.width / 2.0,
                         self.height / 2.0,
                     ]),
@@ -362,7 +367,7 @@ impl<'a> Maze<'a> {
             for x in 0..config.maze_width() {
                 let coord: Coord = [x, y].into();
 
-                for wall in coord.walls(config).iter() {
+                for wall in &coord.walls(config) {
                     walls.insert(*wall);
                 }
 
@@ -392,12 +397,12 @@ impl<'a> Maze<'a> {
         let explored = HashSet::new();
 
         Maze {
-            config: config,
-            walls: walls,
-            cells: cells,
-            start: start,
-            end: end,
-            explored: explored,
+            config,
+            walls,
+            cells,
+            start,
+            end,
+            explored,
             highlight_bright: HashSet::new(),
             highlight_medium: HashSet::new(),
             highlight_dark: HashSet::new(),
@@ -470,8 +475,7 @@ impl<'a> Maze<'a> {
     pub fn link(&mut self, c1: &Coord, c2: &Coord) -> Result<()> {
         match c1.neighbours(self.config.maze_width(), self.config.maze_height())
             .iter()
-            .filter(|n| n.0 == *c2)
-            .next()
+            .find(|n| n.0 == *c2)
         {
             Some((_, direction)) => {
                 let wall = match direction {

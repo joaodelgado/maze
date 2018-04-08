@@ -74,8 +74,7 @@ impl DFS {
 
         neighbours
             .into_iter()
-            .filter(|(c, _)| !maze.explored.contains(&c))
-            .next()
+            .find(|(c, _)| !maze.explored.contains(&c))
     }
 }
 
@@ -88,7 +87,7 @@ impl Generator for DFS {
         maze.highlight_bright.clear();
 
         let current = match self.current {
-            Some(ref current) => current.clone(),
+            Some(ref current) => *current,
             None => return Ok(()),
         };
         maze.explored.insert(current);
@@ -125,13 +124,13 @@ impl Kruskal {
         let mut walls = maze.walls
             .iter()
             .filter(|w| w.removable())
-            .map(|w| w.clone())
+            .cloned()
             .collect::<Vec<_>>();
 
         random().shuffle(&mut walls);
 
         Kruskal {
-            walls: walls,
+            walls,
             sets: maze.cells
                 .keys()
                 .map(|c| {
@@ -148,7 +147,7 @@ impl Kruskal {
         let mut c1_set = self.sets
             .drain_filter(|s| s.contains(&c1))
             .next()
-            .ok_or(Error::MissingSet(c1))?;
+            .ok_or_else(|| Error::MissingSet(c1))?;
 
         if c1_set.contains(&c2) {
             self.sets.push(c1_set);
@@ -158,7 +157,7 @@ impl Kruskal {
         let c2_set = self.sets
             .drain_filter(|s| s.contains(&c2))
             .next()
-            .ok_or(Error::MissingSet(c2))?;
+            .ok_or_else(|| Error::MissingSet(c2))?;
 
         for c in c2_set {
             c1_set.insert(c);
@@ -211,7 +210,7 @@ impl Prim {
         let mut cells = HashSet::new();
         cells.insert(maze.start);
 
-        Prim { cells: cells }
+        Prim { cells }
     }
 
     fn random_cell(&mut self) -> Option<Coord> {

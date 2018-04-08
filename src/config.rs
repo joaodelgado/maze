@@ -120,21 +120,21 @@ impl Config {
 
     #[inline]
     pub fn start(&self) -> Option<Coord> {
-        return self.start;
+        self.start
     }
 
     #[inline]
     pub fn end(&self) -> Option<Coord> {
-        return self.end;
+        self.end
     }
 
     #[inline]
     pub fn interactive_gen(&self) -> bool {
-        return !self.no_interactive_gen;
+        !self.no_interactive_gen
     }
 
     #[inline]
     pub fn interactive_solve(&self) -> bool {
-        return !self.no_interactive_solve;
+        !self.no_interactive_solve
     }
 }

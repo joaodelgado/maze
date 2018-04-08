@@ -49,11 +49,11 @@ impl<'a> App<'a> {
         let solver = config.solver().init(&maze);
 
         Ok(App {
-            maze: maze,
+            maze,
             mode: AppMode::Generating,
-            generator: generator,
-            solver: solver,
-            config: config,
+            generator,
+            solver,
+            config,
         })
     }
 
@@ -143,7 +143,7 @@ fn main() {
             app.render(&r, &mut gl);
         }
 
-        if let Some(_) = e.update_args() {
+        if e.update_args().is_some() {
             match app.tick() {
                 Ok(()) => {}
                 Err(e) => {

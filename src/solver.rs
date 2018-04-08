@@ -70,8 +70,7 @@ impl DFS {
         maze.connected_neighbours(&self.current)
             .into_iter()
             .filter(|(c, _)| !maze.explored.contains(&c))
-            .filter(|(c, _)| !self.stack.contains(&c))
-            .next()
+            .find(|(c, _)| !self.stack.contains(&c))
     }
 }
 
@@ -136,13 +135,7 @@ impl BFS {
         maze.connected_neighbours(&self.current.coord)
             .into_iter()
             .filter(|(c, _)| !maze.explored.contains(&c))
-            .filter(|(c, _)| {
-                !self.queue
-                    .iter()
-                    .filter(|hc| hc.coord == *c)
-                    .next()
-                    .is_some()
-            })
+            .filter(|(c, _)| self.queue.iter().find(|hc| hc.coord == *c).is_none())
             .collect()
     }
 
@@ -167,7 +160,7 @@ impl Solver for BFS {
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         maze.highlight_bright.clear();
 
-        for (neighbour, _) in self.available_neighbours(maze).into_iter() {
+        for (neighbour, _) in self.available_neighbours(maze) {
             self.queue.push_back(BFSNode {
                 coord: neighbour,
                 previous: Some(Box::new(self.current.clone())),
@@ -222,13 +215,7 @@ impl Dijkstra {
         maze.connected_neighbours(&self.current.coord)
             .into_iter()
             .filter(|(c, _)| !maze.explored.contains(&c))
-            .filter(|(c, _)| {
-                !self.queue
-                    .iter()
-                    .filter(|hc| hc.coord == *c)
-                    .next()
-                    .is_some()
-            })
+            .filter(|(c, _)| self.queue.iter().find(|hc| hc.coord == *c).is_none())
             .collect()
     }
 
@@ -254,7 +241,7 @@ impl Solver for Dijkstra {
         maze.highlight_bright.clear();
 
         maze.explored.insert(self.current.coord);
-        for (neighbour, _) in self.available_neighbours(maze).into_iter() {
+        for (neighbour, _) in self.available_neighbours(maze) {
             let dist_to_neighbour = self.current.dist + 1;
 
             let new_neighbour = DijkstraNode {
@@ -327,13 +314,7 @@ impl AStar {
         maze.connected_neighbours(&self.current.coord)
             .into_iter()
             .filter(|(c, _)| !maze.explored.contains(&c))
-            .filter(|(c, _)| {
-                !self.queue
-                    .iter()
-                    .filter(|hc| hc.coord == *c)
-                    .next()
-                    .is_some()
-            })
+            .filter(|(c, _)| self.queue.iter().find(|hc| hc.coord == *c).is_none())
             .collect()
     }
 
@@ -359,7 +340,7 @@ impl Solver for AStar {
         maze.highlight_bright.clear();
 
         maze.explored.insert(self.current.coord);
-        for (neighbour, _) in self.available_neighbours(maze).into_iter() {
+        for (neighbour, _) in self.available_neighbours(maze) {
             let dist_to_neighbour = self.current.dist + 1;
 
             let new_neighbour = AStarNode {
