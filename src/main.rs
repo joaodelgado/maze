@@ -51,7 +51,9 @@ impl<'a> App<'a> {
         if !self.generator.is_done() {
             self.generator.tick(&mut self.maze)?;
         } else {
-            self.maze.highlighted.clear();
+            self.maze.highlight_bright.clear();
+            self.maze.highlight_medium.clear();
+            self.maze.highlight_dark.clear();
             self.maze.explored.clear();
         }
         Ok(())

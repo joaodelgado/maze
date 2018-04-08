@@ -6,7 +6,8 @@ use opengl_graphics::GlGraphics;
 use piston::input::RenderArgs;
 
 use config::{Config, CELL_WALL_WIDTH, COLOR_BACKGROUND, COLOR_END, COLOR_EXPLORED,
-             COLOR_HIGHLIGHT, COLOR_START, COLOR_WALL};
+             COLOR_HIGHLIGHT_BRIGHT, COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START,
+             COLOR_WALL};
 use errors::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -313,7 +314,9 @@ pub struct Maze<'a> {
     pub start: Coord,
     pub end: Coord,
     pub explored: HashSet<Coord>,
-    pub highlighted: HashSet<Coord>,
+    pub highlight_bright: HashSet<Coord>,
+    pub highlight_medium: HashSet<Coord>,
+    pub highlight_dark: HashSet<Coord>,
 }
 
 impl<'a> Maze<'a> {
@@ -350,7 +353,9 @@ impl<'a> Maze<'a> {
             start: [0, 0].into(),
             end: [config.maze_width() - 1, config.maze_height() - 1].into(),
             explored: explored,
-            highlighted: HashSet::new(),
+            highlight_bright: HashSet::new(),
+            highlight_medium: HashSet::new(),
+            highlight_dark: HashSet::new(),
         }
     }
 
@@ -361,12 +366,16 @@ impl<'a> Maze<'a> {
 
         for (coord, cell) in &self.cells {
             let color;
-            if self.highlighted.contains(&coord) {
-                color = Some(COLOR_HIGHLIGHT);
-            } else if *coord == self.start {
+            if *coord == self.start {
                 color = Some(COLOR_START);
             } else if *coord == self.end {
                 color = Some(COLOR_END);
+            } else if self.highlight_bright.contains(&coord) {
+                color = Some(COLOR_HIGHLIGHT_BRIGHT);
+            } else if self.highlight_medium.contains(&coord) {
+                color = Some(COLOR_HIGHLIGHT_MEDIUM);
+            } else if self.highlight_dark.contains(&coord) {
+                color = Some(COLOR_HIGHLIGHT_DARK);
             } else if self.explored.contains(&coord) {
                 color = Some(COLOR_EXPLORED);
             } else {

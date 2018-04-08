@@ -90,6 +90,9 @@ impl Generator for DFS {
             None => return Ok(()),
         };
 
+        maze.highlight_bright.clear();
+        maze.highlight_bright.insert(current);
+
         match self.available_neighbour(&maze) {
             Some((neighbour, _)) => {
                 maze.explored.insert(neighbour);
@@ -97,12 +100,10 @@ impl Generator for DFS {
                 self.stack.push(current);
                 self.current = Some(neighbour);
             }
-            None => self.current = self.stack.pop(),
-        }
-
-        maze.highlighted.clear();
-        if let Some(current) = self.current {
-            maze.highlighted.insert(current);
+            None => {
+                maze.highlight_medium.insert(current);
+                self.current = self.stack.pop();
+            }
         }
 
         Ok(())
@@ -175,7 +176,7 @@ impl Generator for Kruskal {
     }
 
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
-        maze.highlighted.clear();
+        maze.highlight_bright.clear();
         if self.is_done() {
             return Ok(());
         }
@@ -185,8 +186,8 @@ impl Generator for Kruskal {
 
             maze.explored.insert(c1);
             maze.explored.insert(c2);
-            maze.highlighted.insert(c1);
-            maze.highlighted.insert(c2);
+            maze.highlight_bright.insert(c1);
+            maze.highlight_bright.insert(c2);
 
             match self.join(c1, c2) {
                 Err(e) => return Err(e),
@@ -244,13 +245,13 @@ impl Generator for Prim {
     }
 
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
-        maze.highlighted.clear();
+        maze.highlight_bright.clear();
 
         // Unwrap is safe here because of the is_empty check above
         if let Some(wall) = self.random_wall() {
             let (c1, c2) = maze.divided_coords(&wall);
-            maze.highlighted.insert(c1);
-            maze.highlighted.insert(c2);
+            maze.highlight_bright.insert(c1);
+            maze.highlight_bright.insert(c2);
 
             if !maze.explored.contains(&c1) {
                 maze.explored.insert(c1);

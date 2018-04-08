@@ -3,11 +3,15 @@ use graphics::types::Color;
 use generator::GeneratorType;
 
 pub const COLOR_BACKGROUND: Color = [7.0 / 255.0, 16.0 / 255.0, 19.0 / 255.0, 1.0];
-pub const COLOR_EXPLORED: Color = [14.0 / 255.0, 71.0 / 255.0, 73.0 / 255.0, 1.0];
 pub const COLOR_START: Color = [149.0 / 255.0, 198.0 / 255.0, 35.0 / 255.0, 1.0];
 pub const COLOR_END: Color = [229.0 / 255.0, 88.0 / 255.0, 18.0 / 255.0, 1.0];
 pub const COLOR_WALL: Color = [239.0 / 255.0, 231.0 / 255.0, 218.0 / 255.0, 1.0];
-pub const COLOR_HIGHLIGHT: Color = [57.0 / 255.0, 104.0 / 255.0, 106.0 / 255.0, 1.0];
+
+pub const COLOR_EXPLORED: Color = [14.0 / 255.0, 71.0 / 255.0, 73.0 / 255.0, 1.0];
+
+pub const COLOR_HIGHLIGHT_BRIGHT: Color = [163.0 / 255.0, 187.0 / 255.0, 173.0 / 255.0, 1.0];
+pub const COLOR_HIGHLIGHT_MEDIUM: Color = [53.0 / 255.0, 114.0 / 255.0, 102.0 / 255.0, 1.0];
+pub const COLOR_HIGHLIGHT_DARK: Color = [57.0 / 255.0, 104.0 / 255.0, 106.0 / 255.0, 1.0];
 
 pub const CELL_WALL_WIDTH: f64 = 1.0;
 
