@@ -1,6 +1,7 @@
 use graphics::types::Color;
 
 use generator::GeneratorType;
+use maze::Coord;
 use solver::SolverType;
 
 pub const COLOR_BACKGROUND: Color = [7.0 / 255.0, 16.0 / 255.0, 19.0 / 255.0, 1.0];
@@ -25,7 +26,7 @@ pub struct Config {
     generator: GeneratorType,
 
     /// The algorithm to used when solving the maze
-    #[structopt(short = "s", long = "solver", default_value = "dfs",
+    #[structopt(short = "s", long = "solver", default_value = "astar",
                 raw(possible_values = "&SolverType::variants()"))]
     solver: SolverType,
 
@@ -48,6 +49,14 @@ pub struct Config {
     /// The height of the maze in cells
     #[structopt(short = "h", long = "height", default_value = "18")]
     height: u32,
+
+    /// The starting point of the maze
+    #[structopt(long = "start")]
+    start: Option<Coord>,
+
+    /// The ending point of the maze
+    #[structopt(long = "end")]
+    end: Option<Coord>,
 
     /// If provided, the maze generation is done without any visualization
     #[structopt(long = "no-interactive-gen")]
@@ -107,6 +116,16 @@ impl Config {
     #[inline]
     pub fn window_height(&self) -> u32 {
         self.cell_height() * self.maze_height()
+    }
+
+    #[inline]
+    pub fn start(&self) -> Option<Coord> {
+        return self.start;
+    }
+
+    #[inline]
+    pub fn end(&self) -> Option<Coord> {
+        return self.end;
     }
 
     #[inline]

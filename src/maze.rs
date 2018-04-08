@@ -1,9 +1,14 @@
+use std;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use graphics::types::Color;
 use opengl_graphics::GlGraphics;
 use piston::input::RenderArgs;
+
+use rand::{thread_rng as random, Rng};
 
 use config::{Config, CELL_WALL_WIDTH, COLOR_BACKGROUND, COLOR_END, COLOR_EXPLORED,
              COLOR_HIGHLIGHT_BRIGHT, COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START,
@@ -67,6 +72,13 @@ pub struct Coord {
 }
 
 impl Coord {
+    pub fn random(max_x: u32, max_y: u32) -> Coord {
+        Coord {
+            x: random().gen_range(0, max_x) as i32,
+            y: random().gen_range(0, max_y) as i32,
+        }
+    }
+
     pub fn manhattan_dist(&self, other: &Coord) -> u32 {
         ((self.x - other.x).abs() + (self.y - other.y).abs()) as u32
     }
@@ -212,6 +224,24 @@ impl From<[u32; 2]> for Coord {
     }
 }
 
+impl FromStr for Coord {
+    type Err = ParseIntError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let coords: Vec<&str> = s.trim_matches(|p| p == '(' || p == ')')
+            .split(",")
+            .collect();
+
+        let x_fromstr = coords[0].parse::<i32>()?;
+        let y_fromstr = coords[1].parse::<i32>()?;
+
+        Ok(Coord {
+            x: x_fromstr,
+            y: y_fromstr,
+        })
+    }
+}
+
 impl fmt::Display for Coord {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({}, {})", self.x, self.y)
@@ -346,15 +376,27 @@ impl<'a> Maze<'a> {
             }
         }
 
-        let mut explored = HashSet::new();
-        explored.insert([0, 0].into());
+        let start = match config.start() {
+            Some(coord) => coord,
+            None => Coord::random(config.maze_width(), config.maze_height()),
+        };
+        let mut end = match config.end() {
+            Some(coord) => coord,
+            None => Coord::random(config.maze_width(), config.maze_height()),
+        };
+
+        while start == end {
+            end = Coord::random(config.maze_width(), config.maze_height());
+        }
+
+        let explored = HashSet::new();
 
         Maze {
             config: config,
             walls: walls,
             cells: cells,
-            start: [0, 0].into(),
-            end: [config.maze_width() - 1, config.maze_height() - 1].into(),
+            start: start,
+            end: end,
             explored: explored,
             highlight_bright: HashSet::new(),
             highlight_medium: HashSet::new(),

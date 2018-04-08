@@ -235,15 +235,20 @@ impl Generator for Prim {
         maze.highlight_bright.clear();
 
         if let Some(cell) = self.random_cell() {
+            if (cell == maze.start || cell == maze.end) && maze.explored.contains(&cell) {
+                return Ok(());
+            }
+
             maze.explored.insert(cell);
             maze.highlight_medium.remove(&cell);
             maze.highlight_bright.insert(cell);
             self.cells.remove(&cell);
 
-            let explored_neighbours: Vec<_> = maze.neighbours(&cell)
+            let mut explored_neighbours: Vec<_> = maze.neighbours(&cell)
                 .into_iter()
                 .filter(|(n, _)| maze.explored.contains(n))
                 .collect();
+
             let unknown_neighbours: Vec<_> = maze.neighbours(&cell)
                 .into_iter()
                 .filter(|(n, _)| !maze.explored.contains(n))
