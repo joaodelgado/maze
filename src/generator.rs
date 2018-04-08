@@ -42,6 +42,7 @@ impl FromStr for GeneratorType {
 }
 
 pub trait Generator {
+    fn is_done(&self) -> bool;
     fn tick(&mut self, maze: &mut Maze) -> Result<()>;
 }
 
@@ -79,6 +80,10 @@ impl DFS {
 }
 
 impl Generator for DFS {
+    fn is_done(&self) -> bool {
+        self.current.is_none()
+    }
+
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         let current = match self.current {
             Some(ref current) => current.clone(),
@@ -165,9 +170,13 @@ impl Kruskal {
 }
 
 impl Generator for Kruskal {
+    fn is_done(&self) -> bool {
+        self.walls.is_empty() || self.sets.len() <= 1
+    }
+
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         maze.highlighted.clear();
-        if self.walls.is_empty() || self.sets.len() <= 1 {
+        if self.is_done() {
             return Ok(());
         }
 
@@ -230,6 +239,10 @@ impl Prim {
 }
 
 impl Generator for Prim {
+    fn is_done(&self) -> bool {
+        self.walls.is_empty()
+    }
+
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         maze.highlighted.clear();
 

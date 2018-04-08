@@ -77,8 +77,12 @@ impl Coord {
 
     pub fn north_wall(&self, config: &Config) -> Wall {
         let as_point: Point = self.into_point(config.cell_width(), config.cell_height());
+        let offset = match config.cell_height() % 2 == 0 {
+            true => config.cell_height() as i32 / 2,
+            false => (config.cell_height() + 1) as i32 / 2,
+        };
         Wall {
-            center: [as_point.x, as_point.y - config.cell_height() as i32 / 2].into(),
+            center: [as_point.x, as_point.y - offset].into(),
             orientation: Orientation::Horizontal,
             border: self.y == 0,
             size: config.cell_height(),
@@ -107,8 +111,12 @@ impl Coord {
 
     pub fn west_wall(&self, config: &Config) -> Wall {
         let as_point: Point = self.into_point(config.cell_width(), config.cell_height());
+        let offset = match config.cell_width() % 2 == 0 {
+            true => config.cell_width() as i32 / 2,
+            false => (config.cell_width() + 1) as i32 / 2,
+        };
         Wall {
-            center: [as_point.x - config.cell_width() as i32 / 2, as_point.y].into(),
+            center: [as_point.x - offset, as_point.y].into(),
             orientation: Orientation::Vertical,
             border: self.x == 0,
             size: config.cell_width(),
@@ -221,13 +229,24 @@ impl Wall {
     fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
         use graphics::line::Line;
 
+        let offset = match self.size % 2 == 0 {
+            true => 0,
+            false => 1,
+        };
+
         let (start, end): (Point, Point) = match self.orientation {
             Orientation::Horizontal => (
-                [self.center.x - self.size as i32 / 2, self.center.y].into(),
+                [
+                    self.center.x - (self.size + offset) as i32 / 2,
+                    self.center.y,
+                ].into(),
                 [self.center.x + self.size as i32 / 2, self.center.y].into(),
             ),
             Orientation::Vertical => (
-                [self.center.x, self.center.y - self.size as i32 / 2].into(),
+                [
+                    self.center.x,
+                    self.center.y - (self.size + offset) as i32 / 2,
+                ].into(),
                 [self.center.x, self.center.y + self.size as i32 / 2].into(),
             ),
         };

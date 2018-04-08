@@ -48,7 +48,12 @@ impl<'a> App<'a> {
     }
 
     fn tick(&mut self) -> Result<()> {
-        self.generator.tick(&mut self.maze)?;
+        if !self.generator.is_done() {
+            self.generator.tick(&mut self.maze)?;
+        } else {
+            self.maze.highlighted.clear();
+            self.maze.explored.clear();
+        }
         Ok(())
     }
 }
