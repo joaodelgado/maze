@@ -20,12 +20,12 @@ pub const CELL_WALL_WIDTH: f64 = 1.0;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "populate", about = "Generate packages")]
 pub struct Config {
-    /// The algorithm to used when generating the maze
+    /// The algorithm to use when generating the maze
     #[structopt(short = "g", long = "generator", default_value = "dfs",
                 raw(possible_values = "&GeneratorType::variants()"))]
     generator: GeneratorType,
 
-    /// The algorithm to used when solving the maze
+    /// The algorithm to use when solving the maze
     #[structopt(short = "s", long = "solver", default_value = "astar",
                 raw(possible_values = "&SolverType::variants()"))]
     solver: SolverType,

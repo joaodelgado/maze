@@ -1,18 +1,26 @@
 # Circle packing
 
 Small [Piston](https://github.com/PistonDevelopers/piston) project to visualize
-maze generation.
+maze generation and solving.
 
 ![screenshot](./screenshot.png)
 
-The following algorithms are supported:
+Implemented generation algorithms:
 
   - Depth first search
   - Randomized Kruskal
   - Randomized Prim
 
+Implemented solving algorithms:
+
+  - Depth first search
+  - Breadth first search
+  - Dijkstra
+  - A*
+
 **How to run**
 
 ```
-cargo run --release -- -g [dfs|kruskal|prim]
+cargo run --release -- --help
+cargo run --release
 ```
