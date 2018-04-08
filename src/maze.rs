@@ -8,7 +8,7 @@ use piston::input::RenderArgs;
 use config::{Config, CELL_WALL_WIDTH, COLOR_BACKGROUND, COLOR_END, COLOR_EXPLORED,
              COLOR_HIGHLIGHT_BRIGHT, COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START,
              COLOR_WALL};
-use errors::{Error, Result};
+use error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Orientation {
@@ -328,10 +328,9 @@ impl<'a> Maze<'a> {
             for x in 0..config.maze_width() {
                 let coord: Coord = [x, y].into();
 
-                walls.insert(coord.north_wall(config));
-                walls.insert(coord.east_wall(config));
-                walls.insert(coord.south_wall(config));
-                walls.insert(coord.west_wall(config));
+                for wall in coord.walls(config).iter() {
+                    walls.insert(*wall);
+                }
 
                 let mut cell = Cell::new(
                     coord.into_point(config.cell_width(), config.cell_height()),
@@ -452,6 +451,7 @@ impl<'a> Maze<'a> {
      * Coords
      */
 
+    #[allow(unused)]
     pub fn walls(&self, coord: &Coord) -> [Wall; 4] {
         coord.walls(self.config)
     }

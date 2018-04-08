@@ -10,7 +10,7 @@ extern crate piston;
 extern crate rand;
 
 mod config;
-mod errors;
+mod error;
 mod generator;
 mod maze;
 
@@ -23,7 +23,7 @@ use piston::input::{RenderArgs, RenderEvent, UpdateEvent};
 use piston::window::WindowSettings;
 
 use config::Config;
-use errors::Result;
+use error::Result;
 use generator::Generator;
 use maze::Maze;
 

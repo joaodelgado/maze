@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use rand::{thread_rng as random, Rng};
 
-use errors::{Error, Result};
+use error::{Error, Result};
 use maze::{Coord, Direction, Maze, Wall};
 
 #[derive(Debug, Clone, Copy)]
