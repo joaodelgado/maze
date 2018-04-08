@@ -167,7 +167,7 @@ impl Kruskal {
 impl Generator for Kruskal {
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
         maze.highlighted.clear();
-        if self.walls.is_empty() {
+        if self.walls.is_empty() || self.sets.len() <= 1 {
             return Ok(());
         }
 
