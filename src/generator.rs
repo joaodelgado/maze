@@ -90,6 +90,9 @@ impl Generator for DFS {
             Some(ref current) => *current,
             None => return Ok(()),
         };
+
+        maze.highlight_bright.insert(current);
+        maze.highlight_medium.insert(current);
         maze.explored.insert(current);
 
         match self.available_neighbour(&maze) {
@@ -99,12 +102,11 @@ impl Generator for DFS {
                 self.current = Some(neighbour);
             }
             None => {
-                maze.highlight_medium.insert(current);
+                maze.highlight_medium.remove(&current);
                 self.current = self.stack.pop();
             }
         }
 
-        maze.highlight_bright.insert(current);
         Ok(())
     }
 }
