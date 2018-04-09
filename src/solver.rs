@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::rc::Rc;
 use std::str::FromStr;
 
 use error::{Error, Result};
@@ -103,25 +104,24 @@ impl Solver for DFS {
     }
 }
 
-#[derive(Clone)]
 struct BFSNode {
     coord: Coord,
-    previous: Option<Box<BFSNode>>,
+    previous: Option<Rc<BFSNode>>,
 }
 
 pub struct BFS {
-    current: BFSNode,
+    current: Rc<BFSNode>,
     goal: Coord,
-    queue: VecDeque<BFSNode>,
+    queue: VecDeque<Rc<BFSNode>>,
 }
 
 impl BFS {
     fn new(maze: &Maze) -> BFS {
         BFS {
-            current: BFSNode {
+            current: Rc::new(BFSNode {
                 coord: maze.start,
                 previous: None,
-            },
+            }),
             goal: maze.end,
             queue: VecDeque::new(),
         }
@@ -152,7 +152,7 @@ impl BFS {
     }
 }
 
-impl Solver for BFS {
+impl<'a> Solver for BFS {
     fn is_done(&self) -> bool {
         self.goal == self.current.coord
     }
@@ -161,10 +161,10 @@ impl Solver for BFS {
         maze.highlight_bright.clear();
 
         for (neighbour, _) in self.available_neighbours(maze) {
-            self.queue.push_back(BFSNode {
+            self.queue.push_back(Rc::new(BFSNode {
                 coord: neighbour,
-                previous: Some(Box::new(self.current.clone())),
-            });
+                previous: Some(self.current.clone()),
+            }));
             maze.highlight_dark.insert(neighbour);
         }
 
@@ -180,16 +180,16 @@ impl Solver for BFS {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct DijkstraNode {
     coord: Coord,
     dist: u32,
-    previous: Option<Box<DijkstraNode>>,
+    previous: Option<Rc<DijkstraNode>>,
 }
 
 #[derive(Debug)]
 pub struct Dijkstra {
-    current: DijkstraNode,
+    current: Rc<DijkstraNode>,
     goal: Coord,
     queue: Vec<DijkstraNode>,
 }
@@ -197,11 +197,11 @@ pub struct Dijkstra {
 impl Dijkstra {
     fn new(maze: &Maze) -> Dijkstra {
         Dijkstra {
-            current: DijkstraNode {
+            current: Rc::new(DijkstraNode {
                 coord: maze.start,
                 dist: 0,
                 previous: None,
-            },
+            }),
             goal: maze.end,
             queue: vec![],
         }
@@ -247,7 +247,7 @@ impl Solver for Dijkstra {
             let new_neighbour = DijkstraNode {
                 coord: neighbour,
                 dist: dist_to_neighbour,
-                previous: Some(Box::new(self.current.clone())),
+                previous: Some(self.current.clone()),
             };
 
             maze.highlight_dark.insert(neighbour);
@@ -263,7 +263,7 @@ impl Solver for Dijkstra {
         if self.queue.is_empty() {
             return Err(Error::ImpossibleMaze);
         }
-        self.current = self.queue.remove(0);
+        self.current = Rc::new(self.queue.remove(0));
         maze.highlight_dark.remove(&self.current.coord);
 
         maze.highlight_bright.insert(self.current.coord);
@@ -273,30 +273,30 @@ impl Solver for Dijkstra {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct AStarNode {
     coord: Coord,
     dist: u32,
     score: u32,
-    previous: Option<Box<AStarNode>>,
+    previous: Option<Rc<AStarNode>>,
 }
 
 #[derive(Debug)]
 pub struct AStar {
-    current: AStarNode,
+    current: Rc<AStarNode>,
     goal: Coord,
-    queue: Vec<AStarNode>,
+    queue: Vec<Rc<AStarNode>>,
 }
 
 impl AStar {
     fn new(maze: &Maze) -> AStar {
         AStar {
-            current: AStarNode {
+            current: Rc::new(AStarNode {
                 coord: maze.start,
                 dist: 0,
                 score: 0,
                 previous: None,
-            },
+            }),
             goal: maze.end,
             queue: vec![],
         }
@@ -347,7 +347,7 @@ impl Solver for AStar {
                 coord: neighbour,
                 dist: dist_to_neighbour,
                 score: dist_to_neighbour + self.heuristic(&neighbour),
-                previous: Some(Box::new(self.current.clone())),
+                previous: Some(self.current.clone()),
             };
 
             maze.highlight_dark.insert(neighbour);
@@ -355,7 +355,7 @@ impl Solver for AStar {
                 .binary_search_by_key(&new_neighbour.score, |n| n.score)
             {
                 Ok(pos) | Err(pos) => {
-                    self.queue.insert(pos, new_neighbour);
+                    self.queue.insert(pos, Rc::new(new_neighbour));
                 }
             }
         }
