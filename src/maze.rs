@@ -531,6 +531,14 @@ impl<'a> Maze<'a> {
         coord.west_wall(self.config)
     }
 
+    pub fn neighbour(&self, coord: &Coord, direction: &Direction) -> Option<Coord> {
+        coord.neighbour(
+            direction,
+            self.config.maze_width(),
+            self.config.maze_height(),
+        )
+    }
+
     pub fn neighbours(&self, coord: &Coord) -> Vec<(Coord, Direction)> {
         coord.neighbours(self.config.maze_width(), self.config.maze_height())
     }
@@ -544,5 +552,17 @@ impl<'a> Maze<'a> {
                 !self.walls.contains(&wall)
             })
             .collect()
+    }
+
+    /*
+     * Maze config
+     */
+
+    pub fn maze_width(&self) -> u32 {
+        self.config.maze_width()
+    }
+
+    pub fn maze_height(&self) -> u32 {
+        self.config.maze_height()
     }
 }

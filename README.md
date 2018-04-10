@@ -10,6 +10,7 @@ Implemented generation algorithms:
   - Depth first search
   - Randomized Kruskal
   - Randomized Prim
+  - Eller
 
 Implemented solving algorithms:
 

@@ -1,5 +1,6 @@
 #![feature(option_filter)]
 #![feature(drain_filter)]
+#![feature(vec_remove_item)]
 
 #[macro_use]
 extern crate structopt;

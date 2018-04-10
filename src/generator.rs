@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use rand::{thread_rng as random, Rng};
@@ -11,12 +11,13 @@ pub enum GeneratorType {
     DFS,
     Kruskal,
     Prim,
+    Eller,
 }
 
 impl GeneratorType {
     /// A list of possible variants in `&'static str` form
-    pub fn variants() -> [&'static str; 3] {
-        ["dfs", "kruskal", "prim"]
+    pub fn variants() -> [&'static str; 4] {
+        ["dfs", "kruskal", "prim", "eller"]
     }
 
     pub fn init(&self, maze: &Maze) -> Box<Generator> {
@@ -24,6 +25,7 @@ impl GeneratorType {
             GeneratorType::DFS => Box::new(DFS::new(maze)),
             GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
             GeneratorType::Prim => Box::new(Prim::new(maze)),
+            GeneratorType::Eller => Box::new(Eller::new(maze)),
         }
     }
 }
@@ -36,6 +38,7 @@ impl FromStr for GeneratorType {
             "dfs" => Ok(GeneratorType::DFS),
             "kruskal" => Ok(GeneratorType::Kruskal),
             "prim" => Ok(GeneratorType::Prim),
+            "eller" => Ok(GeneratorType::Eller),
             _ => Err(Error::UnsupportedGenerator(s.to_string())),
         }
     }
@@ -268,6 +271,188 @@ impl Generator for Prim {
             for (unknown_neighbour, _) in unknown_neighbours {
                 maze.highlight_medium.insert(unknown_neighbour);
                 self.cells.insert(unknown_neighbour);
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(PartialEq, Eq)]
+enum EllerJoiningMode {
+    Horizontal,
+    Vertical,
+}
+
+pub struct Eller {
+    current: Coord,
+    last_row: i32,
+    mode: EllerJoiningMode,
+    coord_to_set: HashMap<Coord, usize>,
+    set_to_coords: HashMap<usize, Vec<Coord>>,
+    last_set: usize,
+}
+
+impl Eller {
+    pub fn new(maze: &Maze) -> Eller {
+        let current = [0, 0].into();
+        let mut coord_to_set = HashMap::new();
+        let mut set_to_coords = HashMap::new();
+
+        set_to_coords.insert(0, vec![current]);
+        coord_to_set.insert(current, 0);
+
+        Eller {
+            current,
+            last_row: maze.maze_height() as i32 - 1,
+            mode: EllerJoiningMode::Horizontal,
+            coord_to_set,
+            set_to_coords,
+            last_set: 0,
+        }
+    }
+
+    fn same_set(&mut self, c1: &Coord, c2: &Coord) -> bool {
+        if let Some(c1_set_idx) = self.coord_to_set.get(c1) {
+            if let Some(c2_set_idx) = self.coord_to_set.get(c2) {
+                return c1_set_idx == c2_set_idx;
+            }
+        }
+
+        false
+    }
+
+    fn new_set(&mut self, c: Coord) {
+        let next_set = self.last_set + 1;
+        self.add(c, next_set);
+        self.last_set = next_set;
+    }
+
+    fn add(&mut self, c: Coord, set: usize) {
+        if self.coord_to_set.contains_key(&c) {
+            let current_set = self.coord_to_set[&c];
+
+            if current_set == set {
+                return;
+            }
+
+            self.coord_to_set.remove(&c);
+            self.set_to_coords
+                .get_mut(&current_set)
+                .unwrap()
+                .remove_item(&c);
+            self.add(c, set);
+            if self.set_to_coords[&current_set].is_empty() {
+                self.set_to_coords.remove(&current_set);
+            }
+        } else {
+            self.coord_to_set.insert(c, set);
+            if self.set_to_coords.contains_key(&set) {
+                self.set_to_coords.get_mut(&set).unwrap().push(c);
+            } else {
+                self.set_to_coords.insert(set, vec![c]);
+            }
+        }
+    }
+
+    fn join(&mut self, c1: &Coord, c2: Coord) {
+        if self.same_set(c1, &c2) {
+            unreachable!()
+        }
+        let c1_set_idx = self.coord_to_set[c1];
+
+        if !self.coord_to_set.contains_key(&c2) {
+            self.add(c2, c1_set_idx);
+        } else {
+            let c2_set_idx = self.coord_to_set[&c2];
+            let c2_set: Vec<Coord> = self.set_to_coords[&c2_set_idx].to_vec();
+
+            for &cell in &c2_set {
+                self.add(cell, c1_set_idx);
+            }
+        }
+    }
+
+    fn connected_vertically(&self, set: usize, maze: &Maze) -> bool {
+        self.set_to_coords[&set]
+            .iter()
+            .filter(|c| c.y == self.current.y)
+            .any(|c| {
+                let wall = maze.south_wall(c);
+                !maze.walls.contains(&wall)
+            })
+    }
+}
+
+impl Generator for Eller {
+    fn is_done(&self) -> bool {
+        self.mode == EllerJoiningMode::Vertical && self.current.y == self.last_row
+    }
+
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlight_bright.clear();
+        maze.highlight_medium.clear();
+        maze.highlight_dark.clear();
+
+        for x in 0..maze.maze_width() as i32 {
+            maze.highlight_dark.insert([x, self.current.y].into());
+        }
+
+        maze.highlight_bright.insert(self.current);
+        maze.explored.insert(self.current);
+
+        match self.mode {
+            EllerJoiningMode::Horizontal => {
+                let current = self.current;
+                let last_row = current.y == self.last_row;
+                if let Some(neighbour) = maze.neighbour(&current, &Direction::East) {
+                    if !self.same_set(&current, &neighbour) && (last_row || random().gen()) {
+                        self.join(&current, neighbour);
+
+                        let wall = maze.east_wall(&current);
+                        maze.walls.remove(&wall);
+
+                        maze.highlight_medium.insert(neighbour);
+                    } else if !self.coord_to_set.contains_key(&neighbour) {
+                        self.new_set(neighbour);
+                    }
+                    self.current = neighbour;
+                } else {
+                    self.mode = EllerJoiningMode::Vertical;
+                }
+            }
+            EllerJoiningMode::Vertical => {
+                let current_set = self.coord_to_set[&self.current];
+                let last_in_set = maze.neighbour(&self.current, &Direction::West)
+                    .filter(|c| self.coord_to_set[&c] == current_set)
+                    .is_none();
+                let connected = self.connected_vertically(current_set, maze);
+                let force_join = last_in_set && !connected;
+
+                let current = self.current;
+                if force_join || random().gen() {
+                    if let Some(neighbour) = maze.neighbour(&current, &Direction::South) {
+                        self.join(&current, neighbour);
+
+                        let wall = maze.south_wall(&current);
+                        maze.walls.remove(&wall);
+
+                        maze.explored.insert(neighbour);
+                        maze.highlight_medium.insert(neighbour);
+                    }
+                }
+
+                if let Some(neighbour) = maze.neighbour(&self.current, &Direction::West) {
+                    self.current = neighbour;
+                } else {
+                    self.mode = EllerJoiningMode::Horizontal;
+                    if let Some(neighbour) = maze.neighbour(&self.current, &Direction::South) {
+                        if self.coord_to_set.get(&neighbour).is_none() {
+                            self.new_set(neighbour);
+                        }
+                        self.current = neighbour;
+                    }
+                }
             }
         }
 
