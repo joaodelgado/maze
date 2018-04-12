@@ -89,7 +89,7 @@ impl<'a> MainState<'a> {
 
 impl<'a> event::EventHandler for MainState<'a> {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
-        while timer::check_update_time(ctx, self.config.fps()) {
+        while timer::check_update_time(ctx, self.config.ups()) {
             if self.paused {
                 return Ok(());
             }

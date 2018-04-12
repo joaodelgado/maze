@@ -29,8 +29,8 @@ pub struct Config {
     solver: SolverType,
 
     /// Frames per second
-    #[structopt(long = "fps", default_value = "60")]
-    fps: u32,
+    #[structopt(long = "ups", default_value = "60")]
+    ups: u32,
 
     /// The size of each sell in pixels
     #[structopt(long = "cell-size", default_value = "40")]
@@ -73,8 +73,8 @@ impl Config {
     }
 
     #[inline]
-    pub fn fps(&self) -> u32 {
-        self.fps
+    pub fn ups(&self) -> u32 {
+        self.ups
     }
 
     #[inline]

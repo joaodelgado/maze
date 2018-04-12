@@ -90,6 +90,15 @@ impl Coord {
         ]
     }
 
+    pub fn wall(&self, direction: &Direction, config: &Config) -> Wall {
+        match direction {
+            Direction::North => self.north_wall(config),
+            Direction::East => self.east_wall(config),
+            Direction::South => self.south_wall(config),
+            Direction::West => self.west_wall(config),
+        }
+    }
+
     pub fn north_wall(&self, config: &Config) -> Wall {
         let as_point: Point = self.into_point(config.cell_width(), config.cell_height());
         let offset = if config.cell_height() % 2 == 0 {
@@ -536,12 +545,7 @@ impl<'a> Maze<'a> {
     }
 
     pub fn wall(&self, coord: &Coord, direction: &Direction) -> Wall {
-        match direction {
-            Direction::North => self.north_wall(coord),
-            Direction::East => self.east_wall(coord),
-            Direction::South => self.south_wall(coord),
-            Direction::West => self.west_wall(coord),
-        }
+        coord.wall(direction, self.config)
     }
 
     pub fn north_wall(&self, coord: &Coord) -> Wall {

@@ -148,7 +148,7 @@ impl Kruskal {
         }
     }
 
-    fn join(&mut self, c1: Coord, c2: Coord) -> Result<JoinResult> {
+    fn join(&mut self, c1: Coord, c2: Coord, maze: &Maze) -> Result<JoinResult> {
         let mut c1_set = self.sets
             .drain_filter(|s| s.contains(&c1))
             .next()
@@ -165,6 +165,11 @@ impl Kruskal {
             .ok_or_else(|| Error::MissingSet(c2))?;
 
         for c in c2_set {
+            for (neighbour, direction) in maze.neighbours(&c) {
+                if c1_set.contains(&neighbour) {
+                    self.walls.remove_item(&maze.wall(&c, &direction));
+                }
+            }
             c1_set.insert(c);
         }
 
@@ -193,7 +198,7 @@ impl Generator for Kruskal {
             maze.highlight_bright.insert(c1);
             maze.highlight_bright.insert(c2);
 
-            match self.join(c1, c2) {
+            match self.join(c1, c2, maze) {
                 Err(e) => return Err(e),
                 Ok(JoinResult::Joined) => {
                     maze.walls.remove(&wall);
