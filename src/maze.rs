@@ -5,7 +5,7 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 use ggez::graphics;
-use ggez::graphics::Color;
+use ggez::graphics::MeshBuilder;
 use ggez::{Context, GameResult};
 use rand::{thread_rng as random, Rng};
 
@@ -262,32 +262,34 @@ impl Wall {
         !self.border
     }
 
-    fn render(&self, ctx: &mut Context) -> GameResult<()> {
-        let offset = if self.size % 2 == 0 { 0 } else { 1 };
+    fn build_mesh(&self, mb: &mut MeshBuilder) {
+        use graphics::Point2;
+        let offset = if self.size % 2 == 0 { 0.0 } else { 1.0 };
 
-        let (start, end): (Point, Point) = match self.orientation {
+        let (start, end): (Point2, Point2) = match self.orientation {
             Orientation::Horizontal => (
-                [
-                    self.center.x - (self.size + offset) as i32 / 2,
-                    self.center.y,
-                ].into(),
-                [self.center.x + self.size as i32 / 2, self.center.y].into(),
+                Point2::new(
+                    self.center.x as f32 - (self.size as f32 + offset) / 2.0,
+                    self.center.y as f32,
+                ),
+                Point2::new(
+                    self.center.x as f32 + self.size as f32 / 2.0,
+                    self.center.y as f32,
+                ),
             ),
             Orientation::Vertical => (
-                [
-                    self.center.x,
-                    self.center.y - (self.size + offset) as i32 / 2,
-                ].into(),
-                [self.center.x, self.center.y + self.size as i32 / 2].into(),
+                Point2::new(
+                    self.center.x as f32,
+                    self.center.y as f32 - (self.size as f32 + offset) / 2.0,
+                ),
+                Point2::new(
+                    self.center.x as f32,
+                    self.center.y as f32 + self.size as f32 / 2.0,
+                ),
             ),
         };
 
-        let start = graphics::Point2::new(start.x as f32, start.y as f32);
-        let end = graphics::Point2::new(end.x as f32, end.y as f32);
-
-        graphics::set_color(ctx, COLOR_WALL.into())?;
-        graphics::line(ctx, &[start, end], CELL_WALL_WIDTH)?;
-        Ok(())
+        mb.line(&[start, end], CELL_WALL_WIDTH);
     }
 }
 
@@ -313,23 +315,21 @@ impl Cell {
         }
     }
 
-    pub fn render(&self, color: Option<Color>, ctx: &mut Context) -> GameResult<()> {
-        use graphics::{DrawMode, Rect};
-        if let Some(color) = color {
-            graphics::set_color(ctx, color)?;
-            graphics::rectangle(
-                ctx,
-                DrawMode::Fill,
-                Rect::new(
-                    self.center.x as f32 - self.width / 2.0,
-                    self.center.y as f32 - self.height / 2.0,
-                    self.width,
-                    self.height,
-                ),
-            )?;
-        }
-
-        Ok(())
+    pub fn build_mesh(&self, mb: &mut MeshBuilder) {
+        use graphics::{DrawMode, Point2};
+        let x1 = self.center.x as f32 - self.width / 2.0;
+        let x2 = self.center.x as f32 + self.width / 2.0;
+        let y1 = self.center.y as f32 - self.height / 2.0;
+        let y2 = self.center.y as f32 + self.height / 2.0;
+        mb.polygon(
+            DrawMode::Fill,
+            &[
+                Point2::new(x1, y1),
+                Point2::new(x2, y1),
+                Point2::new(x2, y2),
+                Point2::new(x1, y2),
+            ],
+        );
     }
 }
 
@@ -398,29 +398,72 @@ impl<'a> Maze<'a> {
     }
 
     pub fn render(&self, ctx: &mut Context) -> GameResult<()> {
-        for (coord, cell) in &self.cells {
-            let color;
-            if *coord == self.start {
-                color = Some(COLOR_START.into());
-            } else if *coord == self.end {
-                color = Some(COLOR_END);
-            } else if self.highlight_bright.contains(&coord) {
-                color = Some(COLOR_HIGHLIGHT_BRIGHT);
-            } else if self.highlight_medium.contains(&coord) {
-                color = Some(COLOR_HIGHLIGHT_MEDIUM);
-            } else if self.highlight_dark.contains(&coord) {
-                color = Some(COLOR_HIGHLIGHT_DARK);
-            } else if self.explored.contains(&coord) {
-                color = Some(COLOR_EXPLORED);
-            } else {
-                color = None;
-            }
+        let mut start_mb = MeshBuilder::new();
+        let mut end_mb = MeshBuilder::new();
+        let mut highlight_bright_mb = MeshBuilder::new();
+        let mut highlight_medium_mb = MeshBuilder::new();
+        let mut highlight_dark_mb = MeshBuilder::new();
+        let mut explored_mb = MeshBuilder::new();
 
-            cell.render(color.map(|c| c.into()), ctx)?;
+        for (coord, cell) in &self.cells {
+            if *coord == self.start {
+                cell.build_mesh(&mut start_mb);
+            } else if *coord == self.end {
+                cell.build_mesh(&mut end_mb);
+            } else if self.highlight_bright.contains(&coord) {
+                cell.build_mesh(&mut highlight_bright_mb);
+            } else if self.highlight_medium.contains(&coord) {
+                cell.build_mesh(&mut highlight_medium_mb);
+            } else if self.highlight_dark.contains(&coord) {
+                cell.build_mesh(&mut highlight_dark_mb);
+            } else if self.explored.contains(&coord) {
+                cell.build_mesh(&mut explored_mb);
+            }
         }
 
-        for wall in &self.walls {
-            wall.render(ctx)?;
+        let start = start_mb.build(ctx)?;
+        let end = end_mb.build(ctx)?;
+        let highlight_bright = highlight_bright_mb.build(ctx)?;
+        let highlight_medium = highlight_medium_mb.build(ctx)?;
+        let highlight_dark = highlight_dark_mb.build(ctx)?;
+        let explored = explored_mb.build(ctx)?;
+
+        graphics::set_color(ctx, COLOR_START.into())?;
+        graphics::draw_ex(ctx, &start, Default::default())?;
+
+        graphics::set_color(ctx, COLOR_END.into())?;
+        graphics::draw_ex(ctx, &end, Default::default())?;
+
+        graphics::set_color(ctx, COLOR_HIGHLIGHT_BRIGHT.into())?;
+        graphics::draw_ex(ctx, &highlight_bright, Default::default())?;
+
+        graphics::set_color(ctx, COLOR_HIGHLIGHT_MEDIUM.into())?;
+        graphics::draw_ex(ctx, &highlight_medium, Default::default())?;
+
+        graphics::set_color(ctx, COLOR_HIGHLIGHT_DARK.into())?;
+        graphics::draw_ex(ctx, &highlight_dark, Default::default())?;
+
+        graphics::set_color(ctx, COLOR_EXPLORED.into())?;
+        graphics::draw_ex(ctx, &explored, Default::default())?;
+
+        // Use a list of mesh builder because we might run into vertex buffer limits
+        let mut walls_mbs = self.walls
+            .iter()
+            .collect::<Vec<_>>()
+            .chunks(10_000)
+            .map(|walls| {
+                let mut mb = MeshBuilder::new();
+                for wall in walls {
+                    wall.build_mesh(&mut mb);
+                }
+                mb
+            })
+            .collect::<Vec<_>>();
+
+        graphics::set_color(ctx, COLOR_WALL.into())?;
+        for mb in &mut walls_mbs {
+            let mesh = mb.build(ctx)?;
+            graphics::draw_ex(ctx, &mesh, Default::default())?;
         }
 
         Ok(())
