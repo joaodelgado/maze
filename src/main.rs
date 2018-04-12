@@ -4,11 +4,7 @@
 
 #[macro_use]
 extern crate structopt;
-extern crate glutin_window;
-extern crate graphics;
-extern crate opengl_graphics;
-extern crate piston;
-extern crate piston_app;
+extern crate ggez;
 extern crate rand;
 
 mod config;
@@ -19,9 +15,9 @@ mod solver;
 
 use structopt::StructOpt;
 
-use piston_app::prelude::*;
+use ggez::*;
 
-use config::Config;
+use config::{Config, COLOR_BACKGROUND};
 use error::Result;
 use generator::Generator;
 use maze::Maze;
@@ -32,7 +28,7 @@ enum AppMode {
     Solving,
 }
 
-struct App<'a> {
+struct MainState<'a> {
     maze: Maze<'a>,
     mode: AppMode,
     generator: Box<Generator>,
@@ -41,13 +37,13 @@ struct App<'a> {
     paused: bool,
 }
 
-impl<'a> App<'a> {
-    fn new(config: &'a Config) -> Result<App<'a>> {
+impl<'a> MainState<'a> {
+    fn new(config: &'a Config) -> Result<MainState<'a>> {
         let maze = Maze::new(&config);
         let generator = config.generator().init(&maze);
         let solver = config.solver().init(&maze);
 
-        Ok(App {
+        Ok(MainState {
             maze,
             mode: AppMode::Generating,
             generator,
@@ -91,49 +87,65 @@ impl<'a> App<'a> {
     }
 }
 
-impl<'a> Controller for App<'a> {
-    fn render(&mut self, args: &RenderArgs, gl: &mut GlGraphics) {
-        self.maze.render(args, gl);
+impl<'a> event::EventHandler for MainState<'a> {
+    fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        while timer::check_update_time(ctx, self.config.fps()) {
+            if self.paused {
+                return Ok(());
+            }
+
+            match self.mode {
+                AppMode::Generating => match self.tick_gen() {
+                    Ok(()) => {}
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                },
+                AppMode::Solving => match self.tick_solve() {
+                    Ok(()) => {}
+                    Err(e) => eprintln!("[ERROR] {}", e),
+                },
+            }
+        }
+        Ok(())
     }
 
-    fn tick(&mut self, _args: &UpdateArgs) {
-        if self.paused {
-            return;
-        }
-        match self.mode {
-            AppMode::Generating => match self.tick_gen() {
-                Ok(()) => {}
-                Err(e) => eprintln!("[ERROR] {}", e),
-            },
-            AppMode::Solving => match self.tick_solve() {
-                Ok(()) => {}
-                Err(e) => eprintln!("[ERROR] {}", e),
-            },
-        }
+    fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
+        graphics::clear(ctx);
+
+        self.maze.render(ctx)?;
+
+        graphics::present(ctx);
+        timer::yield_now();
+        Ok(())
     }
 }
 
 fn main() {
     let config = Config::from_args();
 
-    let app = match App::new(&config) {
-        Ok(app) => app,
+    let mut state = match MainState::new(&config) {
+        Ok(state) => state,
         Err(e) => {
             eprintln!("[ERROR] {}", e);
             return;
         }
     };
 
-    let mut piston_app = AppBuilder::new(app, [config.window_width(), config.window_height()])
-        .title(format!(
-            "Mazes! Generator: {:?} Solver: {:?}",
-            config.generator(),
-            config.solver()
-        ))
-        .ups(config.ups())
-        .fps(config.fps())
+    let title = format!(
+        "Mazes! Generator: {:?} Solver: {:?}",
+        config.generator(),
+        config.solver()
+    );
+    let mut ctx = ContextBuilder::new("maze", "João Delgado")
+        .window_setup(conf::WindowSetup::default().title(&title))
+        .window_mode(
+            conf::WindowMode::default().dimensions(config.window_width(), config.window_height()),
+        )
         .build()
-        .expect("Error creating window");
+        .expect("Error building context");
 
-    piston_app.run();
+    graphics::set_background_color(&mut ctx, COLOR_BACKGROUND.into());
+
+    if let Err(e) = event::run(&mut ctx, &mut state) {
+        println!("[ERROR] {}", e);
+    }
 }

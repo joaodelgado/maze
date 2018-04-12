@@ -4,15 +4,13 @@ use std::fmt;
 use std::num::ParseIntError;
 use std::str::FromStr;
 
-use graphics::types::Color;
-use opengl_graphics::GlGraphics;
-use piston::input::RenderArgs;
-
+use ggez::graphics;
+use ggez::graphics::Color;
+use ggez::{Context, GameResult};
 use rand::{thread_rng as random, Rng};
 
-use config::{Config, CELL_WALL_WIDTH, COLOR_BACKGROUND, COLOR_END, COLOR_EXPLORED,
-             COLOR_HIGHLIGHT_BRIGHT, COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START,
-             COLOR_WALL};
+use config::{Config, CELL_WALL_WIDTH, COLOR_END, COLOR_EXPLORED, COLOR_HIGHLIGHT_BRIGHT,
+             COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START, COLOR_WALL};
 use error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -264,9 +262,7 @@ impl Wall {
         !self.border
     }
 
-    fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
-        use graphics::line::Line;
-
+    fn render(&self, ctx: &mut Context) -> GameResult<()> {
         let offset = if self.size % 2 == 0 { 0 } else { 1 };
 
         let (start, end): (Point, Point) = match self.orientation {
@@ -286,19 +282,12 @@ impl Wall {
             ),
         };
 
-        gl.draw(args.viewport(), |c, gl| {
-            Line::new(COLOR_WALL, CELL_WALL_WIDTH / 2.0).draw(
-                [
-                    f64::from(start.x),
-                    f64::from(start.y),
-                    f64::from(end.x),
-                    f64::from(end.y),
-                ],
-                &c.draw_state,
-                c.transform,
-                gl,
-            );
-        });
+        let start = graphics::Point2::new(start.x as f32, start.y as f32);
+        let end = graphics::Point2::new(end.x as f32, end.y as f32);
+
+        graphics::set_color(ctx, COLOR_WALL.into())?;
+        graphics::line(ctx, &[start, end], CELL_WALL_WIDTH)?;
+        Ok(())
     }
 }
 
@@ -311,37 +300,36 @@ impl fmt::Display for Wall {
 #[derive(Debug, Clone)]
 pub struct Cell {
     center: Point,
-    width: f64,
-    height: f64,
+    width: f32,
+    height: f32,
 }
 
 impl Cell {
     pub fn new(center: Point, width: u32, height: u32) -> Cell {
         Cell {
             center,
-            width: f64::from(width),
-            height: f64::from(height),
+            width: width as f32,
+            height: height as f32,
         }
     }
 
-    pub fn render(&self, color: Option<Color>, args: &RenderArgs, gl: &mut GlGraphics) {
-        gl.draw(args.viewport(), |c, gl| {
-            use graphics::rectangle::{centered, Rectangle};
+    pub fn render(&self, color: Option<Color>, ctx: &mut Context) -> GameResult<()> {
+        use graphics::{DrawMode, Rect};
+        if let Some(color) = color {
+            graphics::set_color(ctx, color)?;
+            graphics::rectangle(
+                ctx,
+                DrawMode::Fill,
+                Rect::new(
+                    self.center.x as f32 - self.width / 2.0,
+                    self.center.y as f32 - self.height / 2.0,
+                    self.width,
+                    self.height,
+                ),
+            )?;
+        }
 
-            if let Some(color) = color {
-                Rectangle::new(color).draw(
-                    centered([
-                        f64::from(self.center.x),
-                        f64::from(self.center.y),
-                        self.width / 2.0,
-                        self.height / 2.0,
-                    ]),
-                    &c.draw_state,
-                    c.transform,
-                    gl,
-                );
-            }
-        });
+        Ok(())
     }
 }
 
@@ -409,15 +397,11 @@ impl<'a> Maze<'a> {
         }
     }
 
-    pub fn render(&self, args: &RenderArgs, gl: &mut GlGraphics) {
-        use graphics::clear;
-
-        clear(COLOR_BACKGROUND, gl);
-
+    pub fn render(&self, ctx: &mut Context) -> GameResult<()> {
         for (coord, cell) in &self.cells {
             let color;
             if *coord == self.start {
-                color = Some(COLOR_START);
+                color = Some(COLOR_START.into());
             } else if *coord == self.end {
                 color = Some(COLOR_END);
             } else if self.highlight_bright.contains(&coord) {
@@ -432,12 +416,14 @@ impl<'a> Maze<'a> {
                 color = None;
             }
 
-            cell.render(color, args, gl);
+            cell.render(color.map(|c| c.into()), ctx)?;
         }
 
         for wall in &self.walls {
-            wall.render(args, gl);
+            wall.render(ctx)?;
         }
+
+        Ok(())
     }
 
     pub fn divided_coords(&self, wall: &Wall) -> (Coord, Coord) {

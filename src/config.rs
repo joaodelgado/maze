@@ -1,21 +1,19 @@
-use graphics::types::Color;
-
 use generator::GeneratorType;
 use maze::Coord;
 use solver::SolverType;
 
-pub const COLOR_BACKGROUND: Color = [7.0 / 255.0, 16.0 / 255.0, 19.0 / 255.0, 1.0];
-pub const COLOR_START: Color = [149.0 / 255.0, 198.0 / 255.0, 35.0 / 255.0, 1.0];
-pub const COLOR_END: Color = [229.0 / 255.0, 88.0 / 255.0, 18.0 / 255.0, 1.0];
-pub const COLOR_WALL: Color = [239.0 / 255.0, 231.0 / 255.0, 218.0 / 255.0, 1.0];
+pub const COLOR_BACKGROUND: (u8, u8, u8) = (7, 16, 19);
+pub const COLOR_START: (u8, u8, u8) = (149, 198, 35);
+pub const COLOR_END: (u8, u8, u8) = (229, 88, 18);
 
-pub const COLOR_EXPLORED: Color = [14.0 / 255.0, 71.0 / 255.0, 73.0 / 255.0, 1.0];
+pub const COLOR_WALL: (u8, u8, u8) = (239, 231, 218);
 
-pub const COLOR_HIGHLIGHT_BRIGHT: Color = [163.0 / 255.0, 187.0 / 255.0, 173.0 / 255.0, 1.0];
-pub const COLOR_HIGHLIGHT_MEDIUM: Color = [53.0 / 255.0, 114.0 / 255.0, 102.0 / 255.0, 1.0];
-pub const COLOR_HIGHLIGHT_DARK: Color = [57.0 / 255.0, 104.0 / 255.0, 106.0 / 255.0, 1.0];
+pub const COLOR_EXPLORED: (u8, u8, u8) = (14, 71, 73);
+pub const COLOR_HIGHLIGHT_BRIGHT: (u8, u8, u8) = (163, 187, 173);
+pub const COLOR_HIGHLIGHT_MEDIUM: (u8, u8, u8) = (53, 114, 102);
+pub const COLOR_HIGHLIGHT_DARK: (u8, u8, u8) = (57, 104, 106);
 
-pub const CELL_WALL_WIDTH: f64 = 1.0;
+pub const CELL_WALL_WIDTH: f32 = 1.0;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "populate", about = "Generate packages")]
@@ -30,13 +28,9 @@ pub struct Config {
                 raw(possible_values = "&SolverType::variants()"))]
     solver: SolverType,
 
-    /// Updates per second
-    #[structopt(long = "ups", default_value = "60")]
-    ups: u64,
-
     /// Frames per second
     #[structopt(long = "fps", default_value = "60")]
-    fps: u64,
+    fps: u32,
 
     /// The size of each sell in pixels
     #[structopt(long = "cell-size", default_value = "40")]
@@ -79,12 +73,7 @@ impl Config {
     }
 
     #[inline]
-    pub fn ups(&self) -> u64 {
-        self.ups
-    }
-
-    #[inline]
-    pub fn fps(&self) -> u64 {
+    pub fn fps(&self) -> u32 {
         self.fps
     }
 
