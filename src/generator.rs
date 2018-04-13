@@ -1,3 +1,4 @@
+use std::cmp::{max, min};
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
@@ -12,12 +13,13 @@ pub enum GeneratorType {
     Kruskal,
     Prim,
     Eller,
+    HuntKill,
 }
 
 impl GeneratorType {
     /// A list of possible variants in `&'static str` form
-    pub fn variants() -> [&'static str; 4] {
-        ["dfs", "kruskal", "prim", "eller"]
+    pub fn variants() -> [&'static str; 5] {
+        ["dfs", "kruskal", "prim", "eller", "hunt-kill"]
     }
 
     pub fn init(&self, maze: &Maze) -> Box<Generator> {
@@ -26,6 +28,7 @@ impl GeneratorType {
             GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
             GeneratorType::Prim => Box::new(Prim::new(maze)),
             GeneratorType::Eller => Box::new(Eller::new(maze)),
+            GeneratorType::HuntKill => Box::new(HuntKill::new(maze)),
         }
     }
 }
@@ -39,6 +42,7 @@ impl FromStr for GeneratorType {
             "kruskal" => Ok(GeneratorType::Kruskal),
             "prim" => Ok(GeneratorType::Prim),
             "eller" => Ok(GeneratorType::Eller),
+            "hunt-kill" => Ok(GeneratorType::HuntKill),
             _ => Err(Error::UnsupportedGenerator(s.to_string())),
         }
     }
@@ -284,7 +288,7 @@ impl Generator for Prim {
 }
 
 #[derive(PartialEq, Eq)]
-enum EllerJoiningMode {
+enum EllerMode {
     Horizontal,
     Vertical,
 }
@@ -292,7 +296,7 @@ enum EllerJoiningMode {
 pub struct Eller {
     current: Coord,
     last_row: i32,
-    mode: EllerJoiningMode,
+    mode: EllerMode,
     coord_to_set: HashMap<Coord, usize>,
     set_to_coords: HashMap<usize, Vec<Coord>>,
     last_set: usize,
@@ -310,7 +314,7 @@ impl Eller {
         Eller {
             current,
             last_row: maze.maze_height() as i32 - 1,
-            mode: EllerJoiningMode::Horizontal,
+            mode: EllerMode::Horizontal,
             coord_to_set,
             set_to_coords,
             last_set: 0,
@@ -391,7 +395,7 @@ impl Eller {
 
 impl Generator for Eller {
     fn is_done(&self) -> bool {
-        self.mode == EllerJoiningMode::Vertical && self.current.y == self.last_row
+        self.mode == EllerMode::Vertical && self.current.y == self.last_row
     }
 
     fn tick(&mut self, maze: &mut Maze) -> Result<()> {
@@ -407,7 +411,7 @@ impl Generator for Eller {
         maze.explored.insert(self.current);
 
         match self.mode {
-            EllerJoiningMode::Horizontal => {
+            EllerMode::Horizontal => {
                 let current = self.current;
                 let last_row = current.y == self.last_row;
                 if let Some(neighbour) = maze.neighbour(&current, &Direction::East) {
@@ -423,10 +427,11 @@ impl Generator for Eller {
                     }
                     self.current = neighbour;
                 } else {
-                    self.mode = EllerJoiningMode::Vertical;
+                    self.mode = EllerMode::Vertical;
+                    self.current = [0, 0].into();
                 }
             }
-            EllerJoiningMode::Vertical => {
+            EllerMode::Vertical => {
                 let current_set = self.coord_to_set[&self.current];
                 let last_in_set = maze.neighbour(&self.current, &Direction::West)
                     .filter(|c| self.coord_to_set[&c] == current_set)
@@ -450,7 +455,7 @@ impl Generator for Eller {
                 if let Some(neighbour) = maze.neighbour(&self.current, &Direction::West) {
                     self.current = neighbour;
                 } else {
-                    self.mode = EllerJoiningMode::Horizontal;
+                    self.mode = EllerMode::Horizontal;
                     if let Some(neighbour) = maze.neighbour(&self.current, &Direction::South) {
                         if self.coord_to_set.get(&neighbour).is_none() {
                             self.new_set(neighbour);
@@ -462,5 +467,156 @@ impl Generator for Eller {
         }
 
         Ok(())
+    }
+}
+
+#[derive(PartialEq, Eq)]
+enum HuntKillMode {
+    Hunt,
+    Kill,
+}
+
+pub struct HuntKill {
+    current: Option<Coord>,
+    last_completed_row: i32,
+    first_explored_row: i32,
+    mode: HuntKillMode,
+}
+
+impl HuntKill {
+    pub fn new(maze: &Maze) -> HuntKill {
+        HuntKill {
+            current: Some(maze.start),
+            last_completed_row: 0,
+            first_explored_row: maze.maze_height() as i32,
+            mode: HuntKillMode::Kill,
+        }
+    }
+
+    fn available_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
+        let current = match self.current {
+            Some(ref current) => current,
+            None => return None,
+        };
+
+        let mut neighbours = maze.neighbours(current);
+        random().shuffle(&mut neighbours);
+
+        neighbours
+            .into_iter()
+            .find(|(c, _)| !maze.explored.contains(&c))
+    }
+
+    fn current_row(&self, maze: &Maze) -> Vec<Coord> {
+        let current = match self.current {
+            Some(ref current) => current,
+            None => return vec![],
+        };
+
+        (0..maze.maze_width() as i32)
+            .into_iter()
+            .map(|x| [x, current.y].into())
+            .collect()
+    }
+
+    fn visited_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
+        let current = match self.current {
+            Some(ref current) => current,
+            None => return None,
+        };
+
+        if maze.explored.contains(&current) {
+            return None;
+        }
+
+        let mut neighbours = maze.neighbours(current);
+        random().shuffle(&mut neighbours);
+
+        neighbours
+            .into_iter()
+            .find(|(c, _)| maze.explored.contains(&c))
+    }
+
+    fn tick_kill(&mut self, maze: &mut Maze) -> Result<()> {
+        let current = match self.current {
+            Some(ref current) => *current,
+            None => return Ok(()),
+        };
+
+        maze.highlight_bright.insert(current);
+        maze.highlight_medium.insert(current);
+        maze.explored.insert(current);
+
+        if current.y < self.first_explored_row {
+            self.first_explored_row = current.y;
+        }
+
+        match self.available_neighbour(&maze) {
+            Some((neighbour, _)) => {
+                maze.link(&current, &neighbour)?;
+                self.current = Some(neighbour);
+            }
+            None => {
+                self.mode = HuntKillMode::Hunt;
+                let y = max(max(0, self.first_explored_row - 1), self.last_completed_row);
+                self.current = Some([0, y].into());
+            }
+        };
+        Ok(())
+    }
+
+    fn tick_hunt(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlight_medium.clear();
+
+        let current = match self.current {
+            Some(ref current) => *current,
+            None => return Ok(()),
+        };
+
+        for c in self.current_row(maze) {
+            maze.highlight_medium.insert(c);
+        }
+
+        maze.highlight_bright.insert(current);
+
+        match self.visited_neighbour(&maze) {
+            Some((neighbour, _)) => {
+                maze.highlight_medium.clear();
+                maze.highlight_bright.insert(neighbour);
+                maze.link(&current, &neighbour)?;
+                self.mode = HuntKillMode::Kill;
+            }
+            None => {
+                if let Some(neighbour) = maze.neighbour(&current, &Direction::East) {
+                    self.current = Some(neighbour);
+                } else if current.y < maze.maze_height() as i32 - 1 {
+                    if self.current_row(maze)
+                        .iter()
+                        .all(|c| maze.explored.contains(c))
+                    {
+                        self.last_completed_row = current.y + 1;
+                    }
+                    self.current = Some([0, current.y + 1].into());
+                } else {
+                    self.current = None;
+                }
+            }
+        };
+        Ok(())
+    }
+}
+
+impl Generator for HuntKill {
+    fn is_done(&self) -> bool {
+        self.current.is_none()
+    }
+
+    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+        maze.highlight_bright.clear();
+
+        match self.mode {
+            HuntKillMode::Hunt => self.tick_hunt(maze),
+            HuntKillMode::Kill => self.tick_kill(maze),
+        }
     }
 }
