@@ -59,6 +59,10 @@ pub struct Config {
     /// If provided, the maze solving is done without any visualization
     #[structopt(long = "no-interactive-solve")]
     no_interactive_solve: bool,
+
+    /// If provided, the maze will be generated using a static seed
+    #[structopt(long = "seed")]
+    seed: Option<u32>,
 }
 
 impl Config {
@@ -125,5 +129,19 @@ impl Config {
     #[inline]
     pub fn interactive_solve(&self) -> bool {
         !self.no_interactive_solve
+    }
+
+    #[inline]
+    pub fn seed(&self) -> Option<[usize; 4]> {
+        match self.seed {
+            None => None,
+            Some(seed) => {
+                let b1 = ((seed >> 24) & 0xff) as usize;
+                let b2 = ((seed >> 16) & 0xff) as usize;
+                let b3 = ((seed >> 8) & 0xff) as usize;
+                let b4 = (seed & 0xff) as usize;
+                Some([b1, b2, b3, b4])
+            }
+        }
     }
 }

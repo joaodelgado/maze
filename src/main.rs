@@ -13,6 +13,7 @@ mod generator;
 mod maze;
 mod solver;
 
+use rand::{SeedableRng, StdRng};
 use structopt::StructOpt;
 
 use ggez::*;
@@ -34,13 +35,19 @@ struct MainState<'a> {
     generator: Box<Generator>,
     solver: Box<Solver>,
     config: &'a Config,
+    random: StdRng,
     paused: bool,
 }
 
 impl<'a> MainState<'a> {
     fn new(config: &'a Config) -> Result<MainState<'a>> {
-        let maze = Maze::new(&config);
-        let generator = config.generator().init(&maze);
+        let mut random = if let Some(seed) = config.seed() {
+            StdRng::from_seed(&seed)
+        } else {
+            StdRng::new().unwrap()
+        };
+        let maze = Maze::new(&config, &mut random);
+        let generator = config.generator().init(&maze, &mut random);
         let solver = config.solver().init(&maze);
 
         Ok(MainState {
@@ -49,6 +56,7 @@ impl<'a> MainState<'a> {
             generator,
             solver,
             config,
+            random,
             paused: false,
         })
     }
@@ -56,7 +64,7 @@ impl<'a> MainState<'a> {
     fn tick_gen(&mut self) -> Result<()> {
         if !self.config.interactive_gen() {
             while !self.generator.is_done() {
-                self.generator.tick(&mut self.maze)?;
+                self.generator.tick(&mut self.maze, &mut self.random)?;
             }
         }
 
@@ -67,7 +75,7 @@ impl<'a> MainState<'a> {
             self.maze.explored.clear();
             self.mode = AppMode::Solving;
         } else {
-            self.generator.tick(&mut self.maze)?;
+            self.generator.tick(&mut self.maze, &mut self.random)?;
         }
         Ok(())
     }

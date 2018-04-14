@@ -7,7 +7,7 @@ use std::str::FromStr;
 use ggez::graphics;
 use ggez::graphics::MeshBuilder;
 use ggez::{Context, GameResult};
-use rand::{thread_rng as random, Rng};
+use rand::{Rng, StdRng};
 
 use config::{Config, CELL_WALL_WIDTH, COLOR_END, COLOR_EXPLORED, COLOR_HIGHLIGHT_BRIGHT,
              COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START, COLOR_WALL};
@@ -70,10 +70,10 @@ pub struct Coord {
 }
 
 impl Coord {
-    pub fn random(max_x: u32, max_y: u32) -> Coord {
+    pub fn random(max_x: u32, max_y: u32, random: &mut StdRng) -> Coord {
         Coord {
-            x: random().gen_range(0, max_x) as i32,
-            y: random().gen_range(0, max_y) as i32,
+            x: random.gen_range(0, max_x) as i32,
+            y: random.gen_range(0, max_y) as i32,
         }
     }
 
@@ -356,7 +356,7 @@ pub struct Maze<'a> {
 }
 
 impl<'a> Maze<'a> {
-    pub fn new(config: &'a Config) -> Maze {
+    pub fn new<'b>(config: &'a Config, random: &'b mut StdRng) -> Maze<'a> {
         let mut walls = HashSet::new();
         let mut cells = HashMap::new();
 
@@ -380,15 +380,15 @@ impl<'a> Maze<'a> {
 
         let start = match config.start() {
             Some(coord) => coord,
-            None => Coord::random(config.maze_width(), config.maze_height()),
+            None => Coord::random(config.maze_width(), config.maze_height(), random),
         };
         let mut end = match config.end() {
             Some(coord) => coord,
-            None => Coord::random(config.maze_width(), config.maze_height()),
+            None => Coord::random(config.maze_width(), config.maze_height(), random),
         };
 
         while start == end {
-            end = Coord::random(config.maze_width(), config.maze_height());
+            end = Coord::random(config.maze_width(), config.maze_height(), random);
         }
 
         let explored = HashSet::new();

@@ -1,8 +1,8 @@
-use std::cmp::{max, min};
+use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
-use rand::{thread_rng as random, Rng};
+use rand::{Rng, StdRng};
 
 use error::{Error, Result};
 use maze::{Coord, Direction, Maze, Wall};
@@ -22,10 +22,10 @@ impl GeneratorType {
         ["dfs", "kruskal", "prim", "eller", "hunt-kill"]
     }
 
-    pub fn init(&self, maze: &Maze) -> Box<Generator> {
+    pub fn init(&self, maze: &Maze, random: &mut StdRng) -> Box<Generator> {
         match *self {
             GeneratorType::DFS => Box::new(DFS::new(maze)),
-            GeneratorType::Kruskal => Box::new(Kruskal::new(maze)),
+            GeneratorType::Kruskal => Box::new(Kruskal::new(maze, random)),
             GeneratorType::Prim => Box::new(Prim::new(maze)),
             GeneratorType::Eller => Box::new(Eller::new(maze)),
             GeneratorType::HuntKill => Box::new(HuntKill::new(maze)),
@@ -50,7 +50,7 @@ impl FromStr for GeneratorType {
 
 pub trait Generator {
     fn is_done(&self) -> bool;
-    fn tick(&mut self, maze: &mut Maze) -> Result<()>;
+    fn tick(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()>;
 }
 
 pub struct DFS {
@@ -66,7 +66,7 @@ impl DFS {
         }
     }
 
-    fn available_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
+    fn available_neighbour(&self, maze: &Maze, random: &mut StdRng) -> Option<(Coord, Direction)> {
         let current = match self.current {
             Some(ref current) => current,
             None => return None,
@@ -77,7 +77,7 @@ impl DFS {
         }
 
         let mut neighbours = maze.neighbours(current);
-        random().shuffle(&mut neighbours);
+        random.shuffle(&mut neighbours);
 
         neighbours
             .into_iter()
@@ -90,7 +90,7 @@ impl Generator for DFS {
         self.current.is_none()
     }
 
-    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         maze.highlight_bright.clear();
 
         let current = match self.current {
@@ -102,7 +102,7 @@ impl Generator for DFS {
         maze.highlight_medium.insert(current);
         maze.explored.insert(current);
 
-        match self.available_neighbour(&maze) {
+        match self.available_neighbour(&maze, random) {
             Some((neighbour, _)) => {
                 maze.link(&current, &neighbour)?;
                 self.stack.push(current);
@@ -129,14 +129,14 @@ pub struct Kruskal {
 }
 
 impl Kruskal {
-    pub fn new(maze: &Maze) -> Kruskal {
+    pub fn new(maze: &Maze, random: &mut StdRng) -> Kruskal {
         let mut walls = maze.walls
             .iter()
             .filter(|w| w.removable())
             .cloned()
             .collect::<Vec<_>>();
 
-        random().shuffle(&mut walls);
+        random.shuffle(&mut walls);
 
         Kruskal {
             walls,
@@ -188,7 +188,7 @@ impl Generator for Kruskal {
         self.walls.is_empty() || self.sets.len() <= 1
     }
 
-    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick(&mut self, maze: &mut Maze, _random: &mut StdRng) -> Result<()> {
         maze.highlight_bright.clear();
         if self.is_done() {
             return Ok(());
@@ -227,13 +227,13 @@ impl Prim {
         Prim { cells }
     }
 
-    fn random_cell(&mut self) -> Option<Coord> {
+    fn random_cell(&mut self, random: &mut StdRng) -> Option<Coord> {
         if self.cells.is_empty() {
             return None;
         }
         let cell_list: Vec<_> = self.cells.iter().collect();
         // Unwrap is safe here because of the is_empty check above
-        let cell = random().choose(&cell_list).unwrap();
+        let cell = random.choose(&cell_list).unwrap();
 
         Some(**cell)
     }
@@ -244,10 +244,10 @@ impl Generator for Prim {
         self.cells.is_empty()
     }
 
-    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         maze.highlight_bright.clear();
 
-        if let Some(cell) = self.random_cell() {
+        if let Some(cell) = self.random_cell(random) {
             if (cell == maze.start || cell == maze.end) && maze.explored.contains(&cell) {
                 return Ok(());
             }
@@ -267,7 +267,7 @@ impl Generator for Prim {
                 .filter(|(n, _)| !maze.explored.contains(n))
                 .collect();
 
-            if let Some((_, direction)) = random().choose(&explored_neighbours) {
+            if let Some((_, direction)) = random.choose(&explored_neighbours) {
                 let wall = match direction {
                     Direction::North => maze.north_wall(&cell),
                     Direction::East => maze.east_wall(&cell),
@@ -398,7 +398,7 @@ impl Generator for Eller {
         self.mode == EllerMode::Vertical && self.current.y == self.last_row
     }
 
-    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         maze.highlight_bright.clear();
         maze.highlight_medium.clear();
         maze.highlight_dark.clear();
@@ -415,7 +415,7 @@ impl Generator for Eller {
                 let current = self.current;
                 let last_row = current.y == self.last_row;
                 if let Some(neighbour) = maze.neighbour(&current, &Direction::East) {
-                    if !self.same_set(&current, &neighbour) && (last_row || random().gen()) {
+                    if !self.same_set(&current, &neighbour) && (last_row || random.gen()) {
                         self.join(&current, neighbour);
 
                         let wall = maze.east_wall(&current);
@@ -428,7 +428,6 @@ impl Generator for Eller {
                     self.current = neighbour;
                 } else {
                     self.mode = EllerMode::Vertical;
-                    self.current = [0, 0].into();
                 }
             }
             EllerMode::Vertical => {
@@ -440,7 +439,7 @@ impl Generator for Eller {
                 let force_join = last_in_set && !connected;
 
                 let current = self.current;
-                if force_join || random().gen() {
+                if force_join || random.gen() {
                     if let Some(neighbour) = maze.neighbour(&current, &Direction::South) {
                         self.join(&current, neighbour);
 
@@ -493,14 +492,14 @@ impl HuntKill {
         }
     }
 
-    fn available_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
+    fn available_neighbour(&self, maze: &Maze, random: &mut StdRng) -> Option<(Coord, Direction)> {
         let current = match self.current {
             Some(ref current) => current,
             None => return None,
         };
 
         let mut neighbours = maze.neighbours(current);
-        random().shuffle(&mut neighbours);
+        random.shuffle(&mut neighbours);
 
         neighbours
             .into_iter()
@@ -519,7 +518,7 @@ impl HuntKill {
             .collect()
     }
 
-    fn visited_neighbour(&self, maze: &Maze) -> Option<(Coord, Direction)> {
+    fn visited_neighbour(&self, maze: &Maze, random: &mut StdRng) -> Option<(Coord, Direction)> {
         let current = match self.current {
             Some(ref current) => current,
             None => return None,
@@ -530,14 +529,14 @@ impl HuntKill {
         }
 
         let mut neighbours = maze.neighbours(current);
-        random().shuffle(&mut neighbours);
+        random.shuffle(&mut neighbours);
 
         neighbours
             .into_iter()
             .find(|(c, _)| maze.explored.contains(&c))
     }
 
-    fn tick_kill(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick_kill(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         let current = match self.current {
             Some(ref current) => *current,
             None => return Ok(()),
@@ -551,7 +550,7 @@ impl HuntKill {
             self.first_explored_row = current.y;
         }
 
-        match self.available_neighbour(&maze) {
+        match self.available_neighbour(&maze, random) {
             Some((neighbour, _)) => {
                 maze.link(&current, &neighbour)?;
                 self.current = Some(neighbour);
@@ -565,7 +564,7 @@ impl HuntKill {
         Ok(())
     }
 
-    fn tick_hunt(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick_hunt(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         maze.highlight_medium.clear();
 
         let current = match self.current {
@@ -579,7 +578,7 @@ impl HuntKill {
 
         maze.highlight_bright.insert(current);
 
-        match self.visited_neighbour(&maze) {
+        match self.visited_neighbour(&maze, random) {
             Some((neighbour, _)) => {
                 maze.highlight_medium.clear();
                 maze.highlight_bright.insert(neighbour);
@@ -611,12 +610,12 @@ impl Generator for HuntKill {
         self.current.is_none()
     }
 
-    fn tick(&mut self, maze: &mut Maze) -> Result<()> {
+    fn tick(&mut self, maze: &mut Maze, random: &mut StdRng) -> Result<()> {
         maze.highlight_bright.clear();
 
         match self.mode {
-            HuntKillMode::Hunt => self.tick_hunt(maze),
-            HuntKillMode::Kill => self.tick_kill(maze),
+            HuntKillMode::Hunt => self.tick_hunt(maze, random),
+            HuntKillMode::Kill => self.tick_kill(maze, random),
         }
     }
 }
