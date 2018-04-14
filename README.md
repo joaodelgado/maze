@@ -1,7 +1,6 @@
 # Circle packing
 
-Small [Piston](https://github.com/PistonDevelopers/piston) project to visualize
-maze generation and solving.
+Small project to visualize maze generation and solving.
 
 ![screenshot](./screenshot.png)
 
