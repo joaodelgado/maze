@@ -337,6 +337,7 @@ impl Eller {
         self.last_set = next_set;
     }
 
+    #[cfg_attr(feature = "cargo-clippy", allow(map_entry))]
     fn add(&mut self, c: Coord, set: usize) {
         if self.coord_to_set.contains_key(&c) {
             let current_set = self.coord_to_set[&c];

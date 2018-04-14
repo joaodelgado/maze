@@ -13,6 +13,8 @@ mod generator;
 mod maze;
 mod solver;
 
+use std::time::{Duration, Instant};
+
 use rand::{SeedableRng, StdRng};
 use structopt::StructOpt;
 
@@ -24,6 +26,37 @@ use generator::Generator;
 use maze::Maze;
 use solver::Solver;
 
+#[derive(Default)]
+struct Timer {
+    start: Option<Instant>,
+    end: Option<Instant>,
+}
+
+impl Timer {
+    fn is_running(&self) -> bool {
+        self.start.is_some() && self.end.is_none()
+    }
+
+    fn is_stopped(&self) -> bool {
+        !self.is_running()
+    }
+
+    fn start(&mut self) {
+        self.start = Some(Instant::now());
+    }
+
+    fn stop(&mut self) {
+        self.end = Some(Instant::now());
+    }
+
+    fn duration(&self) -> Option<Duration> {
+        let end = self.end?;
+        let start = self.start?;
+
+        Some(end.duration_since(start))
+    }
+}
+
 enum AppMode {
     Generating,
     Solving,
@@ -32,8 +65,13 @@ enum AppMode {
 struct MainState<'a> {
     maze: Maze<'a>,
     mode: AppMode,
+
     generator: Box<Generator>,
     solver: Box<Solver>,
+
+    gen_timer: Timer,
+    solve_timer: Timer,
+
     config: &'a Config,
     random: StdRng,
     paused: bool,
@@ -53,8 +91,13 @@ impl<'a> MainState<'a> {
         Ok(MainState {
             maze,
             mode: AppMode::Generating,
+
             generator,
             solver,
+
+            gen_timer: Timer::default(),
+            solve_timer: Timer::default(),
+
             config,
             random,
             paused: false,
@@ -62,13 +105,26 @@ impl<'a> MainState<'a> {
     }
 
     fn tick_gen(&mut self) -> Result<()> {
+        if self.gen_timer.is_stopped() {
+            self.gen_timer.start();
+        }
+
         if !self.config.interactive_gen() {
             while !self.generator.is_done() {
                 self.generator.tick(&mut self.maze, &mut self.random)?;
             }
+            self.gen_timer.stop();
         }
 
         if self.generator.is_done() {
+            if self.gen_timer.is_running() {
+                self.gen_timer.stop();
+                println!(
+                    "Gen time: {} seconds",
+                    self.gen_timer.duration().unwrap().as_secs()
+                );
+            }
+
             self.maze.highlight_bright.clear();
             self.maze.highlight_medium.clear();
             self.maze.highlight_dark.clear();
@@ -81,14 +137,25 @@ impl<'a> MainState<'a> {
     }
 
     fn tick_solve(&mut self) -> Result<()> {
+        if self.solve_timer.is_stopped() {
+            self.solve_timer.start();
+        }
+
         if !self.config.interactive_solve() {
             while !self.solver.is_done() {
                 self.solver.tick(&mut self.maze)?;
             }
+            self.solve_timer.stop();
         }
 
         if !self.solver.is_done() {
             self.solver.tick(&mut self.maze)?;
+        } else if self.solve_timer.is_running() {
+            self.solve_timer.stop();
+            println!(
+                "Solve time: {} seconds",
+                self.solve_timer.duration().unwrap().as_secs()
+            );
         }
 
         Ok(())
@@ -105,11 +172,17 @@ impl<'a> event::EventHandler for MainState<'a> {
             match self.mode {
                 AppMode::Generating => match self.tick_gen() {
                     Ok(()) => {}
-                    Err(e) => eprintln!("[ERROR] {}", e),
+                    Err(e) => {
+                        eprintln!("[ERROR] {}", e);
+                        self.paused = true;
+                    }
                 },
                 AppMode::Solving => match self.tick_solve() {
                     Ok(()) => {}
-                    Err(e) => eprintln!("[ERROR] {}", e),
+                    Err(e) => {
+                        eprintln!("[ERROR] {}", e);
+                        self.paused = true;
+                    }
                 },
             }
         }
