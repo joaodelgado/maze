@@ -28,7 +28,7 @@ pub struct Config {
                 raw(possible_values = "&SolverType::variants()"))]
     solver: SolverType,
 
-    /// Frames per second
+    /// Updates per second
     #[structopt(long = "ups", default_value = "60")]
     ups: u32,
 
@@ -59,6 +59,10 @@ pub struct Config {
     /// If provided, the maze solving is done without any visualization
     #[structopt(long = "no-interactive-solve")]
     no_interactive_solve: bool,
+
+    /// If provided, average FPS are printed to the console
+    #[structopt(long = "no-print-fps")]
+    print_fps: bool,
 
     /// If provided, the maze will be generated using a static seed
     #[structopt(long = "seed")]
@@ -129,6 +133,11 @@ impl Config {
     #[inline]
     pub fn interactive_solve(&self) -> bool {
         !self.no_interactive_solve
+    }
+
+    #[inline]
+    pub fn print_fps(&self) -> bool {
+        !self.print_fps
     }
 
     #[inline]

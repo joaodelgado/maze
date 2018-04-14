@@ -49,11 +49,23 @@ impl Timer {
         self.end = Some(Instant::now());
     }
 
-    fn duration(&self) -> Option<Duration> {
-        let end = self.end?;
-        let start = self.start?;
+    fn restart(&mut self) {
+        self.reset();
+        self.start();
+    }
 
-        Some(end.duration_since(start))
+    fn reset(&mut self) {
+        self.start = None;
+        self.end = None;
+    }
+
+    fn duration(&self) -> Duration {
+        let start = self.start.expect("Timer not running");
+
+        match self.end {
+            None => start.elapsed(),
+            Some(end) => end.duration_since(start),
+        }
     }
 }
 
@@ -69,6 +81,7 @@ struct MainState<'a> {
     generator: Box<Generator>,
     solver: Box<Solver>,
 
+    fps_timer: Timer,
     gen_timer: Timer,
     solve_timer: Timer,
 
@@ -88,6 +101,9 @@ impl<'a> MainState<'a> {
         let generator = config.generator().init(&maze, &mut random);
         let solver = config.solver().init(&maze);
 
+        let mut fps_timer = Timer::default();
+        fps_timer.start();
+
         Ok(MainState {
             maze,
             mode: AppMode::Generating,
@@ -95,6 +111,7 @@ impl<'a> MainState<'a> {
             generator,
             solver,
 
+            fps_timer,
             gen_timer: Timer::default(),
             solve_timer: Timer::default(),
 
@@ -119,10 +136,7 @@ impl<'a> MainState<'a> {
         if self.generator.is_done() {
             if self.gen_timer.is_running() {
                 self.gen_timer.stop();
-                println!(
-                    "Gen time: {} seconds",
-                    self.gen_timer.duration().unwrap().as_secs()
-                );
+                println!("Gen time: {} seconds", self.gen_timer.duration().as_secs());
             }
 
             self.maze.highlight_bright.clear();
@@ -154,7 +168,7 @@ impl<'a> MainState<'a> {
             self.solve_timer.stop();
             println!(
                 "Solve time: {} seconds",
-                self.solve_timer.duration().unwrap().as_secs()
+                self.solve_timer.duration().as_secs()
             );
         }
 
@@ -164,6 +178,10 @@ impl<'a> MainState<'a> {
 
 impl<'a> event::EventHandler for MainState<'a> {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
+        if self.config.print_fps() && self.fps_timer.duration() > Duration::from_secs(1) {
+            println!("FPS: {}", timer::get_fps(ctx));
+            self.fps_timer.restart();
+        }
         while timer::check_update_time(ctx, self.config.ups()) {
             if self.paused {
                 return Ok(());
