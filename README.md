@@ -1,4 +1,4 @@
-# Circle packing
+# Maze
 
 Small project to visualize maze generation and solving.
 
