@@ -1,4 +1,3 @@
-use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
@@ -22,7 +21,7 @@ impl GeneratorType {
         ["dfs", "kruskal", "prim", "eller", "hunt-kill"]
     }
 
-    pub fn init(&self, maze: &Maze, random: &mut StdRng) -> Box<Generator> {
+    pub fn init(&self, maze: &Maze, random: &mut StdRng) -> Box<dyn Generator> {
         match *self {
             GeneratorType::DFS => Box::new(DFS::new(maze)),
             GeneratorType::Kruskal => Box::new(Kruskal::new(maze, random)),
@@ -130,7 +129,8 @@ pub struct Kruskal {
 
 impl Kruskal {
     pub fn new(maze: &Maze, random: &mut StdRng) -> Kruskal {
-        let mut walls = maze.walls
+        let mut walls = maze
+            .walls
             .iter()
             .filter(|w| w.removable())
             .cloned()
@@ -140,7 +140,8 @@ impl Kruskal {
 
         Kruskal {
             walls,
-            sets: maze.cells
+            sets: maze
+                .cells
                 .keys()
                 .map(|c| {
                     let mut set = HashSet::new();
@@ -153,7 +154,8 @@ impl Kruskal {
     }
 
     fn join(&mut self, c1: Coord, c2: Coord, maze: &Maze) -> Result<JoinResult> {
-        let mut c1_set = self.sets
+        let mut c1_set = self
+            .sets
             .drain_filter(|s| s.contains(&c1))
             .next()
             .ok_or_else(|| Error::MissingSet(c1))?;
@@ -163,7 +165,8 @@ impl Kruskal {
             return Ok(JoinResult::Nop);
         }
 
-        let c2_set = self.sets
+        let c2_set = self
+            .sets
             .drain_filter(|s| s.contains(&c2))
             .next()
             .ok_or_else(|| Error::MissingSet(c2))?;
@@ -257,12 +260,14 @@ impl Generator for Prim {
             maze.highlight_bright.insert(cell);
             self.cells.remove(&cell);
 
-            let mut explored_neighbours: Vec<_> = maze.neighbours(&cell)
+            let explored_neighbours: Vec<_> = maze
+                .neighbours(&cell)
                 .into_iter()
                 .filter(|(n, _)| maze.explored.contains(n))
                 .collect();
 
-            let unknown_neighbours: Vec<_> = maze.neighbours(&cell)
+            let unknown_neighbours: Vec<_> = maze
+                .neighbours(&cell)
                 .into_iter()
                 .filter(|(n, _)| !maze.explored.contains(n))
                 .collect();
@@ -337,7 +342,7 @@ impl Eller {
         self.last_set = next_set;
     }
 
-    #[cfg_attr(feature = "cargo-clippy", allow(map_entry))]
+    #[allow(clippy::map_entry)]
     fn add(&mut self, c: Coord, set: usize) {
         if self.coord_to_set.contains_key(&c) {
             let current_set = self.coord_to_set[&c];
@@ -433,7 +438,8 @@ impl Generator for Eller {
             }
             EllerMode::Vertical => {
                 let current_set = self.coord_to_set[&self.current];
-                let last_in_set = maze.neighbour(&self.current, &Direction::West)
+                let last_in_set = maze
+                    .neighbour(&self.current, &Direction::West)
                     .filter(|c| self.coord_to_set[&c] == current_set)
                     .is_none();
                 let connected = self.connected_vertically(current_set, maze);
@@ -478,17 +484,17 @@ enum HuntKillMode {
 
 pub struct HuntKill {
     current: Option<Coord>,
+    last_completed_column: i32,
     last_completed_row: i32,
-    first_explored_row: i32,
     mode: HuntKillMode,
 }
 
 impl HuntKill {
-    pub fn new(maze: &Maze) -> HuntKill {
+    pub fn new(_maze: &Maze) -> HuntKill {
         HuntKill {
-            current: Some(maze.start),
+            current: Some(Coord { x: 0, y: 0 }),
+            last_completed_column: 0,
             last_completed_row: 0,
-            first_explored_row: maze.maze_height() as i32,
             mode: HuntKillMode::Kill,
         }
     }
@@ -547,10 +553,6 @@ impl HuntKill {
         maze.highlight_medium.insert(current);
         maze.explored.insert(current);
 
-        if current.y < self.first_explored_row {
-            self.first_explored_row = current.y;
-        }
-
         match self.available_neighbour(&maze, random) {
             Some((neighbour, _)) => {
                 maze.link(&current, &neighbour)?;
@@ -558,8 +560,7 @@ impl HuntKill {
             }
             None => {
                 self.mode = HuntKillMode::Hunt;
-                let y = max(max(0, self.first_explored_row - 1), self.last_completed_row);
-                self.current = Some([0, y].into());
+                self.current = Some([self.last_completed_column, self.last_completed_row].into());
             }
         };
         Ok(())
@@ -584,13 +585,15 @@ impl HuntKill {
                 maze.highlight_medium.clear();
                 maze.highlight_bright.insert(neighbour);
                 maze.link(&current, &neighbour)?;
+                self.last_completed_column = current.x;
                 self.mode = HuntKillMode::Kill;
             }
             None => {
                 if let Some(neighbour) = maze.neighbour(&current, &Direction::East) {
                     self.current = Some(neighbour);
                 } else if current.y < maze.maze_height() as i32 - 1 {
-                    if self.current_row(maze)
+                    if self
+                        .current_row(maze)
                         .iter()
                         .all(|c| maze.explored.contains(c))
                     {

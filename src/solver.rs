@@ -20,7 +20,7 @@ impl SolverType {
         ["dfs", "bfs", "dijkstra", "greedy", "astar"]
     }
 
-    pub fn init(&self, maze: &Maze) -> Box<Solver> {
+    pub fn init(&self, maze: &Maze) -> Box<dyn Solver> {
         match *self {
             SolverType::DFS => Box::new(DFS::new(maze)),
             SolverType::BFS => Box::new(BFS::new(maze)),
@@ -254,7 +254,8 @@ impl Solver for Dijkstra {
             };
 
             maze.highlight_dark.insert(neighbour);
-            match self.queue
+            match self
+                .queue
                 .binary_search_by_key(&new_neighbour.dist, |n| n.dist)
             {
                 Ok(pos) | Err(pos) => {
@@ -349,7 +350,8 @@ impl Solver for Greedy {
             };
 
             maze.highlight_dark.insert(neighbour);
-            match self.queue
+            match self
+                .queue
                 .binary_search_by_key(&new_neighbour.score, |n| n.score)
             {
                 Ok(pos) | Err(pos) => {
@@ -449,7 +451,8 @@ impl Solver for AStar {
             };
 
             maze.highlight_dark.insert(neighbour);
-            match self.queue
+            match self
+                .queue
                 .binary_search_by_key(&new_neighbour.score, |n| n.score)
             {
                 Ok(pos) | Err(pos) => {

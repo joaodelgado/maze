@@ -5,12 +5,16 @@ use std::num::ParseIntError;
 use std::str::FromStr;
 
 use ggez::graphics;
+use ggez::graphics::Color;
 use ggez::graphics::MeshBuilder;
+use ggez::mint::Point2;
 use ggez::{Context, GameResult};
 use rand::{Rng, StdRng};
 
-use config::{Config, CELL_WALL_WIDTH, COLOR_END, COLOR_EXPLORED, COLOR_HIGHLIGHT_BRIGHT,
-             COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START, COLOR_WALL};
+use config::{
+    Config, CELL_WALL_WIDTH, COLOR_END, COLOR_EXPLORED, COLOR_HIGHLIGHT_BRIGHT,
+    COLOR_HIGHLIGHT_DARK, COLOR_HIGHLIGHT_MEDIUM, COLOR_START, COLOR_WALL,
+};
 use error::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -158,7 +162,9 @@ impl Coord {
     }
 
     pub fn valid_coord(&self, maze_width: u32, maze_height: u32) -> bool {
-        self.x >= 0 && self.x <= (maze_width - 1) as i32 && self.y >= 0
+        self.x >= 0
+            && self.x <= (maze_width - 1) as i32
+            && self.y >= 0
             && self.y <= (maze_height - 1) as i32
     }
 
@@ -212,10 +218,11 @@ impl Coord {
                 self.neighbour(&Direction::West, maze_width, maze_height),
                 Direction::West,
             ),
-        ].into_iter()
-            .filter(|(coord, _)| coord.is_some())
-            .map(|(c, d)| (c.unwrap(), d))
-            .collect()
+        ]
+        .into_iter()
+        .filter(|(coord, _)| coord.is_some())
+        .map(|(c, d)| (c.unwrap(), d))
+        .collect()
     }
 }
 
@@ -238,7 +245,8 @@ impl FromStr for Coord {
     type Err = ParseIntError;
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let coords: Vec<&str> = s.trim_matches(|p| p == '(' || p == ')')
+        let coords: Vec<&str> = s
+            .trim_matches(|p| p == '(' || p == ')')
             .split(',')
             .collect();
 
@@ -271,34 +279,33 @@ impl Wall {
         !self.border
     }
 
-    fn build_mesh(&self, mb: &mut MeshBuilder) {
-        use graphics::Point2;
+    fn build_mesh(&self, mb: &mut MeshBuilder, color: Color) {
         let offset = if self.size % 2 == 0 { 0.0 } else { 1.0 };
 
-        let (start, end): (Point2, Point2) = match self.orientation {
+        let (start, end) = match self.orientation {
             Orientation::Horizontal => (
-                Point2::new(
-                    self.center.x as f32 - (self.size as f32 + offset) / 2.0,
-                    self.center.y as f32,
-                ),
-                Point2::new(
-                    self.center.x as f32 + self.size as f32 / 2.0,
-                    self.center.y as f32,
-                ),
+                Point2 {
+                    x: self.center.x as f32 - (self.size as f32 + offset) / 2.0,
+                    y: self.center.y as f32,
+                },
+                Point2 {
+                    x: self.center.x as f32 + self.size as f32 / 2.0,
+                    y: self.center.y as f32,
+                },
             ),
             Orientation::Vertical => (
-                Point2::new(
-                    self.center.x as f32,
-                    self.center.y as f32 - (self.size as f32 + offset) / 2.0,
-                ),
-                Point2::new(
-                    self.center.x as f32,
-                    self.center.y as f32 + self.size as f32 / 2.0,
-                ),
+                Point2 {
+                    x: self.center.x as f32,
+                    y: self.center.y as f32 - (self.size as f32 + offset) / 2.0,
+                },
+                Point2 {
+                    x: self.center.x as f32,
+                    y: self.center.y as f32 + self.size as f32 / 2.0,
+                },
             ),
         };
 
-        mb.line(&[start, end], CELL_WALL_WIDTH);
+        mb.line(&[start, end], CELL_WALL_WIDTH, color).unwrap();
     }
 }
 
@@ -324,21 +331,23 @@ impl Cell {
         }
     }
 
-    pub fn build_mesh(&self, mb: &mut MeshBuilder) {
-        use graphics::{DrawMode, Point2};
+    pub fn build_mesh(&self, mb: &mut MeshBuilder, color: Color) {
+        use graphics::DrawMode;
         let x1 = self.center.x as f32 - self.width / 2.0;
         let x2 = self.center.x as f32 + self.width / 2.0;
         let y1 = self.center.y as f32 - self.height / 2.0;
         let y2 = self.center.y as f32 + self.height / 2.0;
         mb.polygon(
-            DrawMode::Fill,
+            DrawMode::fill(),
             &[
-                Point2::new(x1, y1),
-                Point2::new(x2, y1),
-                Point2::new(x2, y2),
-                Point2::new(x1, y2),
+                Point2 { x: x1, y: y1 },
+                Point2 { x: x2, y: y1 },
+                Point2 { x: x2, y: y2 },
+                Point2 { x: x1, y: y2 },
             ],
-        );
+            color,
+        )
+        .unwrap();
     }
 }
 
@@ -368,7 +377,7 @@ impl<'a> Maze<'a> {
                     walls.insert(*wall);
                 }
 
-                let mut cell = Cell::new(
+                let cell = Cell::new(
                     coord.into_point(config.cell_width(), config.cell_height()),
                     config.cell_width(),
                     config.cell_height(),
@@ -416,63 +425,57 @@ impl<'a> Maze<'a> {
 
         for (coord, cell) in &self.cells {
             if *coord == self.start {
-                cell.build_mesh(&mut start_mb);
+                cell.build_mesh(&mut start_mb, COLOR_START.into());
             } else if *coord == self.end {
-                cell.build_mesh(&mut end_mb);
+                cell.build_mesh(&mut end_mb, COLOR_END.into());
             } else if self.highlight_bright.contains(&coord) {
-                cell.build_mesh(&mut highlight_bright_mb);
+                cell.build_mesh(&mut highlight_bright_mb, COLOR_HIGHLIGHT_BRIGHT.into());
             } else if self.highlight_medium.contains(&coord) {
-                cell.build_mesh(&mut highlight_medium_mb);
+                cell.build_mesh(&mut highlight_medium_mb, COLOR_HIGHLIGHT_MEDIUM.into());
             } else if self.highlight_dark.contains(&coord) {
-                cell.build_mesh(&mut highlight_dark_mb);
+                cell.build_mesh(&mut highlight_dark_mb, COLOR_HIGHLIGHT_DARK.into());
             } else if self.explored.contains(&coord) {
-                cell.build_mesh(&mut explored_mb);
+                cell.build_mesh(&mut explored_mb, COLOR_EXPLORED.into());
             }
         }
 
-        let start = start_mb.build(ctx)?;
-        let end = end_mb.build(ctx)?;
-        let highlight_bright = highlight_bright_mb.build(ctx)?;
-        let highlight_medium = highlight_medium_mb.build(ctx)?;
-        let highlight_dark = highlight_dark_mb.build(ctx)?;
-        let explored = explored_mb.build(ctx)?;
-
-        graphics::set_color(ctx, COLOR_START.into())?;
-        graphics::draw_ex(ctx, &start, Default::default())?;
-
-        graphics::set_color(ctx, COLOR_END.into())?;
-        graphics::draw_ex(ctx, &end, Default::default())?;
-
-        graphics::set_color(ctx, COLOR_HIGHLIGHT_BRIGHT.into())?;
-        graphics::draw_ex(ctx, &highlight_bright, Default::default())?;
-
-        graphics::set_color(ctx, COLOR_HIGHLIGHT_MEDIUM.into())?;
-        graphics::draw_ex(ctx, &highlight_medium, Default::default())?;
-
-        graphics::set_color(ctx, COLOR_HIGHLIGHT_DARK.into())?;
-        graphics::draw_ex(ctx, &highlight_dark, Default::default())?;
-
-        graphics::set_color(ctx, COLOR_EXPLORED.into())?;
-        graphics::draw_ex(ctx, &explored, Default::default())?;
+        if let Ok(m) = start_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
+        if let Ok(m) = end_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
+        if let Ok(m) = highlight_bright_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
+        if let Ok(m) = highlight_medium_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
+        if let Ok(m) = highlight_dark_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
+        if let Ok(m) = explored_mb.build(ctx) {
+            graphics::draw(ctx, &m, graphics::DrawParam::default())?;
+        }
 
         // Use a list of mesh builder because we might run into vertex buffer limits
-        let mut walls_mbs = self.walls
+        let mut walls_mbs = self
+            .walls
             .iter()
             .collect::<Vec<_>>()
             .chunks(10_000)
             .map(|walls| {
                 let mut mb = MeshBuilder::new();
                 for wall in walls {
-                    wall.build_mesh(&mut mb);
+                    wall.build_mesh(&mut mb, COLOR_WALL.into());
                 }
                 mb
             })
             .collect::<Vec<_>>();
 
-        graphics::set_color(ctx, COLOR_WALL.into())?;
         for mb in &mut walls_mbs {
             let mesh = mb.build(ctx)?;
-            graphics::draw_ex(ctx, &mesh, Default::default())?;
+            graphics::draw(ctx, &mesh, graphics::DrawParam::default())?;
         }
 
         Ok(())
@@ -484,26 +487,27 @@ impl<'a> Maze<'a> {
                 let up: Coord = Point {
                     y: wall.center.y - self.config.cell_height() as i32 / 2,
                     ..wall.center
-                }.into_coord(self.config.cell_width(), self.config.cell_height());
-                let down: Coord =
-                    Point {
-                        y: wall.center.y + self.config.cell_height() as i32 / 2,
-                        ..wall.center
-                    }.into_coord(self.config.cell_width(), self.config.cell_height());
+                }
+                .into_coord(self.config.cell_width(), self.config.cell_height());
+                let down: Coord = Point {
+                    y: wall.center.y + self.config.cell_height() as i32 / 2,
+                    ..wall.center
+                }
+                .into_coord(self.config.cell_width(), self.config.cell_height());
 
                 (up, down)
             }
             Orientation::Vertical => {
-                let left: Coord =
-                    Point {
-                        x: wall.center.x - self.config.cell_width() as i32 / 2,
-                        ..wall.center
-                    }.into_coord(self.config.cell_width(), self.config.cell_height());
-                let right: Coord =
-                    Point {
-                        x: wall.center.x + self.config.cell_width() as i32 / 2,
-                        ..wall.center
-                    }.into_coord(self.config.cell_width(), self.config.cell_height());
+                let left: Coord = Point {
+                    x: wall.center.x - self.config.cell_width() as i32 / 2,
+                    ..wall.center
+                }
+                .into_coord(self.config.cell_width(), self.config.cell_height());
+                let right: Coord = Point {
+                    x: wall.center.x + self.config.cell_width() as i32 / 2,
+                    ..wall.center
+                }
+                .into_coord(self.config.cell_width(), self.config.cell_height());
 
                 (left, right)
             }
@@ -511,7 +515,8 @@ impl<'a> Maze<'a> {
     }
 
     pub fn link(&mut self, c1: &Coord, c2: &Coord) -> Result<()> {
-        match c1.neighbours(self.config.maze_width(), self.config.maze_height())
+        match c1
+            .neighbours(self.config.maze_width(), self.config.maze_height())
             .iter()
             .find(|n| n.0 == *c2)
         {

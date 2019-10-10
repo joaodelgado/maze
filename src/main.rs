@@ -1,4 +1,3 @@
-#![feature(option_filter)]
 #![feature(drain_filter)]
 #![feature(vec_remove_item)]
 
@@ -78,8 +77,8 @@ struct MainState<'a> {
     maze: Maze<'a>,
     mode: AppMode,
 
-    generator: Box<Generator>,
-    solver: Box<Solver>,
+    generator: Box<dyn Generator>,
+    solver: Box<dyn Solver>,
 
     fps_timer: Timer,
     gen_timer: Timer,
@@ -179,7 +178,7 @@ impl<'a> MainState<'a> {
 impl<'a> event::EventHandler for MainState<'a> {
     fn update(&mut self, ctx: &mut Context) -> GameResult<()> {
         if self.config.print_fps() && self.fps_timer.duration() > Duration::from_secs(1) {
-            println!("FPS: {}", timer::get_fps(ctx));
+            println!("FPS: {}", timer::fps(ctx));
             self.fps_timer.restart();
         }
         while timer::check_update_time(ctx, self.config.ups()) {
@@ -208,11 +207,11 @@ impl<'a> event::EventHandler for MainState<'a> {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        graphics::clear(ctx);
+        graphics::clear(ctx, COLOR_BACKGROUND.into());
 
         self.maze.render(ctx)?;
 
-        graphics::present(ctx);
+        graphics::present(ctx)?;
         timer::yield_now();
         Ok(())
     }
@@ -234,17 +233,16 @@ fn main() {
         config.generator(),
         config.solver()
     );
-    let mut ctx = ContextBuilder::new("maze", "João Delgado")
+    let (mut ctx, mut event_loop) = ContextBuilder::new("maze", "João Delgado")
         .window_setup(conf::WindowSetup::default().title(&title))
         .window_mode(
-            conf::WindowMode::default().dimensions(config.window_width(), config.window_height()),
+            conf::WindowMode::default()
+                .dimensions(config.window_width() as f32, config.window_height() as f32),
         )
         .build()
         .expect("Error building context");
 
-    graphics::set_background_color(&mut ctx, COLOR_BACKGROUND.into());
-
-    if let Err(e) = event::run(&mut ctx, &mut state) {
+    if let Err(e) = event::run(&mut ctx, &mut event_loop, &mut state) {
         println!("[ERROR] {}", e);
     }
 }

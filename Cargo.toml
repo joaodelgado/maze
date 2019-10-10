@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["João Delgado <joaomtdelgado@gmail.com>"]
 
 [dependencies]
-ggez = "0.4.2"
+ggez = "0.5"
 rand = "0.4.2"
 structopt = "0.2.6"
 structopt-derive = "0.2.6"
